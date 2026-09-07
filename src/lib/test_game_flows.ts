@@ -40,8 +40,7 @@ async function runTests() {
     getZones,
     getActiveHiders,
     getActiveSeekers,
-    eliminatePlayer,
-    logout
+    eliminatePlayer
   } = await import('./gameService.js');
 
   let passed = 0;
@@ -126,6 +125,9 @@ async function runTests() {
   // Seeker targets Hider 1 ('mock-hider-1')
   const activeHidersBefore = await getActiveHiders();
   assert(activeHidersBefore.some((h) => h.id === 'mock-hider-1'), 'Hider 1 is initially active in target list');
+
+  const activeSeekers = await getActiveSeekers();
+  assert(activeSeekers.length >= 2, 'Active seekers list is retrievable');
 
   const elimResult = await eliminatePlayer(goodSeekerLogin.profile.id, 'mock-hider-1', 'HIDER');
   assert(elimResult.success === true, 'Seeker eliminates Hider 1 successfully');
