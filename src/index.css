@@ -1,0 +1,47 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@400;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-cyber-dark text-cyber-text font-mono overflow-hidden;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display tracking-wider uppercase;
+  }
+}
+
+@layer utilities {
+  .bg-scanlines {
+    background-size: 100% 4px;
+  }
+  
+  .glass-panel {
+    @apply bg-cyber-panel/80 backdrop-blur-md border border-cyber-border;
+  }
+  
+  .neon-text {
+    text-shadow: 0 0 10px rgba(0, 255, 204, 0.5);
+  }
+  
+  .neon-border {
+    box-shadow: 0 0 10px rgba(0, 255, 204, 0.2), inset 0 0 10px rgba(0, 255, 204, 0.1);
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #111;
+}
+::-webkit-scrollbar-thumb {
+  background: #333;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #00ffcc;
+}
