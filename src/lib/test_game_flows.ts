@@ -58,10 +58,10 @@ async function runTests() {
 
   // TEST 1: Login Authentication
   console.log("[1] Testing Login & Authentication...");
-  const badLogin = await login('hider1', 'wrongpass');
+  const badLogin = await login('hider1', 'wrongpass') as { error: string };
   assert('error' in badLogin && badLogin.error === 'INVALID CREDENTIALS', 'Invalid credentials rejected');
 
-  const goodHiderLogin = await login('hider1', 'hide123');
+  const goodHiderLogin = await login('hider1', 'hide123') as { profile: any };
   assert('profile' in goodHiderLogin && goodHiderLogin.profile.role === 'HIDER', 'Hider login succeeds with correct role');
   assert('profile' in goodHiderLogin && goodHiderLogin.profile.status === 'ACTIVE', 'Hider initial status is ACTIVE');
 
@@ -75,7 +75,7 @@ async function runTests() {
   assert(hiderChallenges.every((c: any) => !('answer' in c) || c.answer === undefined), 'Secret challenge answers are NOT exposed to client');
 
   // Seeker attempting to get hider challenges
-  const goodSeekerLogin = await login('seeker1', 'seek123');
+  const goodSeekerLogin = await login('seeker1', 'seek123') as { profile: any };
   assert('profile' in goodSeekerLogin && goodSeekerLogin.profile.role === 'SEEKER', 'Seeker login succeeds');
   const seekerGettingHiderChallenges = await getHiderChallenges(goodSeekerLogin.profile.id);
   assert(seekerGettingHiderChallenges.length === 0, 'Seeker cannot access hider challenge pool');
@@ -142,7 +142,7 @@ async function runTests() {
   // TEST 6: Eliminated Player Lockdown
   console.log("\n[6] Testing Eliminated Player Lockdown & Access Revocation...");
   // Hider 1 tries to log in after being eliminated
-  const eliminatedLogin = await login('hider1', 'hide123');
+  const eliminatedLogin = await login('hider1', 'hide123') as { profile: any };
   assert('profile' in eliminatedLogin && eliminatedLogin.profile.status === 'ELIMINATED', 'Eliminated player profile returns status ELIMINATED');
 
   // Eliminated player cannot solve challenges
@@ -157,10 +157,16 @@ async function runTests() {
   console.log(`TEST RESULTS: ${passed} PASSED, ${failed} FAILED`);
   console.log("=================================================");
 
-  if (failed > 0) process.exit(1);
+  if (failed > 0) {
+    // @ts-ignore
+    if (typeof process !== 'undefined') process.exit(1);
+    else throw new Error("Tests failed");
+  }
 }
 
 runTests().catch((e) => {
   console.error("Test execution failed:", e);
-  process.exit(1);
+  // @ts-ignore
+  if (typeof process !== 'undefined') process.exit(1);
+  else throw e;
 });

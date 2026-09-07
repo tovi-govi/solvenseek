@@ -4,6 +4,7 @@ import gsap from 'gsap';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '../store/authStore';
 import { isMockMode } from '../lib/supabase';
+import RippleGrid from '../components/ui/RippleGrid';
 
 export function Login() {
   const navigate = useNavigate();
@@ -92,13 +93,18 @@ export function Login() {
   return (
     <div className="relative w-screen h-screen bg-black overflow-hidden flex items-center justify-center font-mono">
       {/* Background grid */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          backgroundImage: 'linear-gradient(rgba(0,255,204,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,204,0.04) 1px,transparent 1px)',
-          backgroundSize: '60px 60px',
-        }}
-      />
+      <div className="absolute inset-0 z-0 pointer-events-auto">
+        <RippleGrid
+          enableRainbow={false}
+          gridColor="#00ffcc"
+          rippleIntensity={0.05}
+          gridSize={10}
+          gridThickness={15}
+          mouseInteraction={true}
+          mouseInteractionRadius={1.2}
+          opacity={0.3}
+        />
+      </div>
 
       {/* Ambient corner glow */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-cyber-accent/5 blur-[120px] pointer-events-none" />
