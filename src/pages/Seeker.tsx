@@ -13,7 +13,7 @@ import { GlitchText } from '../components/ui/GlitchText';
 
 export function Seeker() {
   const navigate = useNavigate();
-  const { profile, updateTokens, updateStatus } = useAuthStore();
+  const { profile, updateTokens, updateStatus, logout } = useAuthStore();
   const { load, isLoaded } = useSeekerStore();
   const [selectedChallengeId, setSelectedChallengeId] = useState<string | null>(null);
   const [isBooting, setIsBooting] = useState(true);
@@ -105,6 +105,17 @@ export function Seeker() {
           accentColor="[#00ff41]"
           accentHex="#00ff41"
         />
+        <div className="mt-auto p-4 border-t border-[#00ff41]/20 bg-[#020502]">
+          <button
+            onClick={async () => {
+              await logout();
+              navigate('/', { replace: true });
+            }}
+            className="w-full border border-[#00ff41]/30 bg-[#00ff41]/5 text-[#00ff41] font-mono text-xs tracking-widest py-3 uppercase hover:bg-[#00ff41]/10 hover:shadow-[0_0_15px_rgba(0,255,65,0.2)] transition-all"
+          >
+            [ DISCONNECT ]
+          </button>
+        </div>
       </div>
 
       {/* Challenge Modal Overlay */}
