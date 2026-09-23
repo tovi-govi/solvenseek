@@ -78,13 +78,17 @@ export const MOCK_USERS: Record<string, MockUser> = {
 };
 
 // ---------------------------------------------------------------------------
-// Zones (SVG polygon coordinates mapped to the campus floor plan)
+// Zones (Real IIIT Kottayam Campus Facilities — Central Academic/Admin, Dining & Amenities, Sports)
 // ---------------------------------------------------------------------------
 export const MOCK_ZONES: Zone[] = [
-  { id: 'zone-1', name: 'AUDITORIUM',       points: '140,220 220,190 340,190 400,220 400,340 370,380 290,380 270,350 200,350 140,330', isAccessible: false, isRestricted: true },
-  { id: 'zone-2', name: 'LIBRARY',           points: '380,430 520,430 520,480 580,480 580,670 470,670 470,590 380,590', isAccessible: false, isRestricted: true },
-  { id: 'zone-3', name: 'EXHIBITION AREA',   points: '610,280 710,280 740,310 770,310 770,430 740,460 650,460 630,430 610,430', isAccessible: false, isRestricted: true },
-  { id: 'zone-6', name: 'DIGITAL ARCH ROOM', points: '670,500 760,500 780,520 810,520 810,610 730,610 710,590 670,590', isAccessible: false, isRestricted: true },
+  { id: 'academic_1', name: 'ACADEMIC BLOCK 1', points: '140,220 220,190 340,190 400,220 400,340', isAccessible: true, isRestricted: false },
+  { id: 'academic_2', name: 'ACADEMIC BLOCK 2', points: '380,430 520,430 520,480 580,480 580,670', isAccessible: true, isRestricted: false },
+  { id: 'admin',      name: 'ADMIN BLOCK',      points: '610,280 710,280 740,310 770,310 770,430', isAccessible: true, isRestricted: false },
+  { id: 'oat',        name: 'OPEN AREA THEATRE (OAT)', points: '670,500 760,500 780,520 810,520 810,610', isAccessible: true, isRestricted: false },
+  { id: 'dining',     name: 'DINING HALL & CAFETERIA', points: '300,100 450,100 450,200 300,200', isAccessible: true, isRestricted: false },
+  { id: 'fitness',    name: 'FITNESS CENTRE / GYM', points: '150,100 250,100 250,200 150,200', isAccessible: true, isRestricted: false },
+  { id: 'sports_ground', name: 'MAIN SPORTS GROUND', points: '300,550 550,550 550,720 300,720', isAccessible: true, isRestricted: false },
+  { id: 'volleyball', name: 'VOLLEYBALL GROUND', points: '600,550 720,550 720,680 600,680', isAccessible: true, isRestricted: false },
 ];
 
 // ---------------------------------------------------------------------------

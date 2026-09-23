@@ -91,15 +91,17 @@ export interface SeekerTelemetry {
   id: string;
   playerId: string;          // e.g. S-001
   name: string;              // e.g. "Echo Agent"
-  zoneId: 'new-west' | 'admin' | 'new-east' | 'corridor';
-  zoneName: string;          // e.g. "New Building (West)", "Admin Block"
+  zoneId: string;            // e.g. 'academic_1' | 'academic_2' | 'admin' | 'oat' | 'dining' | 'fitness' | 'sports_ground' | 'volleyball'
+  zoneName: string;          // e.g. "Academic Block 1", "Main Sports Ground"
   x: number;                 // Normalized map coordinate (0-1000)
   y: number;                 // Normalized map coordinate (0-800)
+  lat?: number;              // Real-world GPS Latitude (e.g. 9.754904)
+  lon?: number;              // Real-world GPS Longitude (e.g. 76.649988)
   battery: number;           // Battery % (e.g. 84)
   signal: 'STRONG' | 'GOOD' | 'WEAK';
   status: 'ACTIVE' | 'CLAIMING_ARTIFACT' | 'IN_TRANSIT';
   speedKmh?: number;
-  qrScannedCount?: number;   // 10 valid / 5 wrong
+  qrScannedCount?: number;   // Valid artifacts scanned
   lastPing: number;          // timestamp ms
 }
 

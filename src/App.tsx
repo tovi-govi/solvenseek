@@ -4,7 +4,21 @@ import { Surveillance } from './pages/Surveillance';
 import { Login } from './pages/Login';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
-  const { profile } = useAuthStore();
+  const { profile, isInitialized } = useAuthStore();
+
+  // If session is still verifying with Firebase and no cached profile is available
+  if (!isInitialized && !profile) {
+    return (
+      <div className="min-h-screen bg-[#030712] flex items-center justify-center font-mono text-cyber-accent">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-cyber-accent border-t-transparent rounded-full animate-spin" />
+          <span className="text-xs tracking-widest uppercase animate-pulse">
+            INITIALIZING SURVEILLANCE SESSION...
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   if (!profile) {
     return <Navigate to="/login" replace />;
@@ -14,7 +28,11 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 }
 
 function RedirectIfAuthed({ children }: { children: React.ReactNode }) {
-  const { profile } = useAuthStore();
+  const { profile, isInitialized } = useAuthStore();
+
+  if (!isInitialized && !profile) {
+    return null;
+  }
 
   if (profile) {
     return <Navigate to="/" replace />;
@@ -62,8 +80,8 @@ function AppRoutes() {
         }
       />
 
-      {/* Catch-all */}
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      {/* Catch-all: redirect to root command dashboard (protected) */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

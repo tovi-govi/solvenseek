@@ -16,6 +16,8 @@ import {
   CheckCircle,
 } from 'lucide-react';
 
+import { IIITK_FACILITIES, latLngToGrid } from '../../lib/iiitkCampusData';
+
 interface SeekerTelemetryDrawerProps {
   onClose?: () => void;
 }
@@ -35,7 +37,7 @@ export function SeekerTelemetryDrawer({ onClose }: SeekerTelemetryDrawerProps) {
   // New Seeker Form fields
   const [newNodeName, setNewNodeName] = useState('');
   const [newNodeId, setNewNodeId] = useState('');
-  const [newZone, setNewZone] = useState<'new-west' | 'admin' | 'new-east'>('new-west');
+  const [newZone, setNewZone] = useState<string>('academic_1');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const selectedSeeker = seekers.find((s) => s.id === selectedSeekerId) ?? seekers[0];
@@ -48,25 +50,20 @@ export function SeekerTelemetryDrawer({ onClose }: SeekerTelemetryDrawerProps) {
 
     setIsSubmitting(true);
 
-    let x = 235, y = 235, zoneName = 'New Building (West Wing)';
-    if (newZone === 'admin') {
-      x = 490;
-      y = 540;
-      zoneName = 'Admin Block (Central Plaza)';
-    } else if (newZone === 'new-east') {
-      x = 780;
-      y = 260;
-      zoneName = 'New Building East (Floor 2)';
-    }
+    const facility = IIITK_FACILITIES.find((f) => f.key === newZone) || IIITK_FACILITIES[0];
+    const [lat, lon] = facility.center;
+    const { x, y } = latLngToGrid(lat, lon);
 
     const newSeeker: SeekerTelemetry = {
       id: `seeker-${Date.now()}`,
       playerId: newNodeId.trim().toUpperCase(),
       name: newNodeName.trim(),
-      zoneId: newZone,
-      zoneName,
+      zoneId: facility.key,
+      zoneName: facility.name,
       x,
       y,
+      lat,
+      lon,
       battery: 100,
       signal: 'STRONG',
       status: 'ACTIVE',
@@ -371,12 +368,14 @@ export function SeekerTelemetryDrawer({ onClose }: SeekerTelemetryDrawerProps) {
                   </label>
                   <select
                     value={newZone}
-                    onChange={(e) => setNewZone(e.target.value as 'new-west' | 'admin' | 'new-east')}
+                    onChange={(e) => setNewZone(e.target.value)}
                     className="w-full bg-black/70 border border-white/15 rounded px-2.5 py-1.5 text-xs text-white focus:border-cyber-accent focus:outline-none"
                   >
-                    <option value="new-west">New Building (West Wing)</option>
-                    <option value="admin">Admin Block (Central Plaza)</option>
-                    <option value="new-east">New Building East (Floor 2)</option>
+                    {IIITK_FACILITIES.map((fac) => (
+                      <option key={fac.key} value={fac.key}>
+                        {fac.name} [{fac.shortCategory}]
+                      </option>
+                    ))}
                   </select>
                 </div>
 
