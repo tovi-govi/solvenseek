@@ -10,6 +10,7 @@ import {
   Radio,
   ExternalLink,
 } from 'lucide-react';
+import FaultyTerminal from '../components/ui/FaultyTerminal';
 
 export function Login() {
   const navigate = useNavigate();
@@ -60,20 +61,31 @@ export function Login() {
 
   return (
     <div className="relative min-h-screen w-screen bg-[#02050e] text-white font-mono flex flex-col items-center justify-center p-4 overflow-hidden select-none">
-      {/* Background Cyber Grid Lines */}
-      <div 
-        className="absolute inset-0 pointer-events-none opacity-20"
-        style={{
-          backgroundImage: `
-            linear-gradient(to right, rgba(0, 240, 255, 0.1) 1px, transparent 1px),
-            linear-gradient(to bottom, rgba(0, 240, 255, 0.1) 1px, transparent 1px)
-          `,
-          backgroundSize: '40px 40px',
-        }}
-      />
+      {/* Dynamic FaultyTerminal WebGL Canvas Backdrop */}
+      <div className="absolute inset-0 pointer-events-auto z-0">
+        <FaultyTerminal
+          scale={1.5}
+          gridMul={[2, 1]}
+          digitSize={1.2}
+          timeScale={0.35}
+          pause={false}
+          scanlineIntensity={0.5}
+          glitchAmount={1.1}
+          flickerAmount={0.7}
+          noiseAmp={0.9}
+          chromaticAberration={0.3}
+          dither={0.2}
+          curvature={0.12}
+          tint="#00f0ff"
+          mouseReact={true}
+          mouseStrength={0.3}
+          pageLoadAnimation={true}
+          brightness={0.5}
+        />
+      </div>
 
-      {/* Radial Glow Underlay */}
-      <div className="absolute w-[600px] h-[600px] rounded-full bg-cyber-accent/5 blur-[120px] pointer-events-none" />
+      {/* Subtle vignette overlay to ensure pristine card legibility */}
+      <div className="absolute inset-0 bg-gradient-to-t from-[#02050e]/90 via-[#02050e]/30 to-[#02050e]/80 pointer-events-none z-[1]" />
 
       {/* Main Authentication Card */}
       <motion.div

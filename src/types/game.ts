@@ -4,83 +4,19 @@
 
 export type UserRole = 'HIDER' | 'SEEKER' | 'SURVEILLANCE';
 export type UserStatus = 'ACTIVE' | 'ELIMINATED';
-export type ParticipantStatus = 'NOT_FOUND' | 'FOUND' | 'ELIMINATED';
-export type ChallengeDifficulty = 'EASY' | 'MEDIUM' | 'HARD';
-export type GameStatus = 'NOT_STARTED' | 'ACTIVE' | 'ENDED';
-export type ChallengeCategory =
-  | 'Cryptography'
-  | 'Programming'
-  | 'Web'
-  | 'Linux'
-  | 'Logic'
-  | 'Reverse Engineering'
-  | 'OSINT'
-  | 'General CTF';
 
 // ---------------------------------------------------------------------------
-// Profile — the authoritative user record returned from the backend
+// Profile — Authoritative operator user record from Firebase
 // ---------------------------------------------------------------------------
 
 export interface Profile {
   id: string;
   username: string;
-  playerId: string;   // display code e.g. H-014 or S-007
+  playerId: string; // display code e.g. SURV-E12F
   role: UserRole;
   status: UserStatus;
   eliminationTokens: number;
   createdAt?: string;
-}
-
-// ---------------------------------------------------------------------------
-// Map / Zones  (used by SEEKERS for the campus map)
-// ---------------------------------------------------------------------------
-
-export interface Zone {
-  id: string;
-  name: string;
-  points: string;     // SVG polygon point string
-  isAccessible: boolean;
-  isRestricted: boolean;
-}
-
-// ---------------------------------------------------------------------------
-// Hider challenges — CTF-style questions solved by HIDERS (no map)
-// Answers NEVER included, validated server-side
-// ---------------------------------------------------------------------------
-
-export interface HiderChallenge {
-  id: string;
-  title: string;
-  description: string;
-  difficulty: ChallengeDifficulty;
-  category: ChallengeCategory;
-  hints: string[];
-  points: number;
-  solved: boolean;
-}
-
-// ---------------------------------------------------------------------------
-// Seeker challenges — map-zone challenges solved by SEEKERS to unlock areas
-// Answers NEVER included, validated server-side
-// ---------------------------------------------------------------------------
-
-export interface SeekerChallenge {
-  id: string;
-  title: string;
-  description: string;
-  difficulty: ChallengeDifficulty;
-  locationId: string;
-  solved: boolean;
-}
-
-// ---------------------------------------------------------------------------
-// Targeting
-// ---------------------------------------------------------------------------
-
-export interface ActiveHider {
-  id: string;
-  username: string;
-  playerId: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -89,33 +25,20 @@ export interface ActiveHider {
 
 export interface SeekerTelemetry {
   id: string;
-  playerId: string;          // e.g. S-001
-  name: string;              // e.g. "Echo Agent"
-  zoneId: string;            // e.g. 'academic_1' | 'academic_2' | 'admin' | 'oat' | 'dining' | 'fitness' | 'sports_ground' | 'volleyball'
-  zoneName: string;          // e.g. "Academic Block 1", "Main Sports Ground"
-  x: number;                 // Normalized map coordinate (0-1000)
-  y: number;                 // Normalized map coordinate (0-800)
-  lat?: number;              // Real-world GPS Latitude (e.g. 9.754904)
-  lon?: number;              // Real-world GPS Longitude (e.g. 76.649988)
-  battery: number;           // Battery % (e.g. 84)
+  playerId: string; // e.g. S-001
+  name: string; // e.g. "Echo Agent"
+  zoneId: string; // e.g. 'academic_1' | 'admin' | 'sports_ground'
+  zoneName: string; // e.g. "Academic Block 1", "Main Sports Ground"
+  x: number; // Normalized map coordinate (0-1000)
+  y: number; // Normalized map coordinate (0-800)
+  lat?: number; // Real-world GPS Latitude (e.g. 9.754904)
+  lon?: number; // Real-world GPS Longitude (e.g. 76.649988)
+  battery: number; // Battery % (e.g. 84)
   signal: 'STRONG' | 'GOOD' | 'WEAK';
   status: 'ACTIVE' | 'CLAIMING_ARTIFACT' | 'IN_TRANSIT';
   speedKmh?: number;
-  qrScannedCount?: number;   // Valid artifacts scanned
-  lastPing: number;          // timestamp ms
-}
-
-export interface Participant {
-  id: string;
-  playerId: string;          // e.g. H-014 or S-007
-  name: string;
-  role: 'HIDER' | 'SEEKER';
-  status: ParticipantStatus;
-  foundAt?: number | null;
-  foundBy?: string | null;   // Seeker playerId who found them
-  foundLocation?: string | null;
-  notes?: string;
-  lastUpdated: number;
+  qrScannedCount?: number; // Valid artifacts scanned
+  lastPing: number; // timestamp ms
 }
 
 export interface SeekerBroadcast {
@@ -130,48 +53,4 @@ export interface SeekerBroadcast {
   }[];
   totalActiveSeekers: number;
   operator: string;
-}
-
-// ---------------------------------------------------------------------------
-// Game config (global state)
-// ---------------------------------------------------------------------------
-
-export interface GameConfig {
-  status: GameStatus;
-  startTime: number | null;
-  endTime: number | null;
-}
-
-// ---------------------------------------------------------------------------
-// Legacy types kept for backward compatibility with existing components
-// ---------------------------------------------------------------------------
-
-export type Team = UserRole;
-
-export interface Player {
-  id: string;
-  name: string;
-  team: Team;
-  status: 'HIDDEN' | 'EXPOSED' | 'ELIMINATED';
-  eliminationsAvailable: number;
-  challengesSolved: string[];
-}
-
-export interface Challenge {
-  id: string;
-  title: string;
-  description: string;
-  difficulty: ChallengeDifficulty;
-  locationId: string;
-  answer: string;
-  solved: boolean;
-}
-
-export interface GameState {
-  startTime: number;
-  endTime: number;
-  status: 'WAITING' | 'ACTIVE' | 'FINISHED';
-  player: Player;
-  challenges: Challenge[];
-  zones: Zone[];
 }

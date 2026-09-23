@@ -328,23 +328,3 @@ export function latLngToGrid(lat: number, lon: number): { x: number; y: number }
     y: Math.round(Math.max(0, Math.min(750, pctY * 750)))
   };
 }
-
-/**
- * Find the closest facility to a given GPS position.
- */
-export function findClosestFacility(lat: number, lon: number): CampusFacility | null {
-  let closest: CampusFacility | null = null;
-  let minDistance = Infinity;
-
-  for (const fac of IIITK_FACILITIES) {
-    const dLat = fac.center[0] - lat;
-    const dLon = fac.center[1] - lon;
-    const dist = dLat * dLat + dLon * dLon;
-    if (dist < minDistance) {
-      minDistance = dist;
-      closest = fac;
-    }
-  }
-
-  return closest;
-}

@@ -21,6 +21,26 @@ interface SurveillanceMapProps {
   onSelectSeeker?: (seeker: SeekerTelemetry) => void;
 }
 
+const CARTO_API_KEY = import.meta.env.VITE_CARTO_API_KEY || 'cb1_2m04_1_3f470e2298f7bf1f28a78ef9';
+
+// Tile layer configurations
+const TILE_URLS = {
+  tactical: {
+    url: CARTO_API_KEY
+      ? `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?key=${CARTO_API_KEY}`
+      : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 20,
+    subdomains: 'abcd',
+  },
+  satellite: {
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    attribution: '&copy; Esri &copy; OpenStreetMap contributors',
+    maxZoom: 19,
+    subdomains: 'abc',
+  },
+};
+
 export function SurveillanceMap({ onSelectSeeker }: SurveillanceMapProps) {
   const { seekers, selectedSeekerId, setSelectedSeeker } = useSurveillanceStore();
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -31,26 +51,6 @@ export function SurveillanceMap({ onSelectSeeker }: SurveillanceMapProps) {
 
   const [mapMode, setMapMode] = useState<'tactical' | 'satellite'>('tactical');
   const [selectedFacility, setSelectedFacility] = useState<CampusFacility | null>(null);
-
-  const cartoApiKey = import.meta.env.VITE_CARTO_API_KEY || 'cb1_2m04_1_3f470e2298f7bf1f28a78ef9';
-
-  // Tile layer configurations
-  const TILE_URLS = {
-    tactical: {
-      url: cartoApiKey
-        ? `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?key=${cartoApiKey}`
-        : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-      attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-      maxZoom: 20,
-      subdomains: 'abcd',
-    },
-    satellite: {
-      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      attribution: '&copy; Esri &copy; OpenStreetMap contributors',
-      maxZoom: 19,
-      subdomains: 'abc',
-    },
-  };
 
   // Initialize Leaflet Map
   useEffect(() => {
