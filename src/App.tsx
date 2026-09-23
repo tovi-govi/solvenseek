@@ -1,70 +1,71 @@
-import { useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/authStore';
-import { ProtectedRoute } from './components/auth/ProtectedRoute';
+import { Surveillance } from './pages/Surveillance';
 import { Login } from './pages/Login';
-import { Hider } from './pages/Hider';
-import { Seeker } from './pages/Seeker';
-import { Eliminated } from './pages/Eliminated';
-import { Rules } from './pages/Rules';
 
-function AppRoutes() {
-  const { initialize, isInitialized } = useAuthStore();
-  const initialized = useRef(false);
+function RequireAuth({ children }: { children: React.ReactNode }) {
+  const { profile } = useAuthStore();
 
-  useEffect(() => {
-    if (!initialized.current) {
-      initialized.current = true;
-      initialize();
-    }
-  }, [initialize]);
-
-  if (!isInitialized) {
-    return (
-      <div className="w-screen h-screen bg-black flex items-center justify-center font-mono text-cyber-accent tracking-widest text-sm animate-pulse">
-        OPENVERSE // INITIALIZING...
-      </div>
-    );
+  if (!profile) {
+    return <Navigate to="/login" replace />;
   }
 
-  return (
-    <Routes>
-      <Route path="/" element={<Login />} />
-      <Route
-        path="/hider"
-        element={
-          <ProtectedRoute requiredRole="HIDER">
-            <Hider />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/seeker"
-        element={
-          <ProtectedRoute requiredRole="SEEKER">
-            <Seeker />
-          </ProtectedRoute>
-        }
-      />
-      <Route path="/eliminated" element={<Eliminated />} />
-      <Route path="/rules" element={<Rules />} />
-      {/* Legacy routes redirect */}
-      <Route path="/game" element={<LegacyRedirect />} />
-      <Route path="*" element={<Login />} />
-    </Routes>
-  );
+  return <>{children}</>;
 }
 
-function LegacyRedirect() {
-  const navigate = useNavigate();
+function RedirectIfAuthed({ children }: { children: React.ReactNode }) {
   const { profile } = useAuthStore();
-  useEffect(() => {
-    if (profile?.role === 'HIDER') navigate('/hider', { replace: true });
-    else if (profile?.role === 'SEEKER') navigate('/seeker', { replace: true });
-    else navigate('/', { replace: true });
-  }, [profile, navigate]);
-  return null;
+
+  if (profile) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <>{children}</>;
+}
+
+function AppRoutes() {
+  return (
+    <Routes>
+      {/* Login Portal */}
+      <Route
+        path="/login"
+        element={
+          <RedirectIfAuthed>
+            <Login />
+          </RedirectIfAuthed>
+        }
+      />
+
+      {/* Protected Surveillance Command Center */}
+      <Route
+        path="/"
+        element={
+          <RequireAuth>
+            <Surveillance />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/team"
+        element={
+          <RequireAuth>
+            <Surveillance />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/surveillance"
+        element={
+          <RequireAuth>
+            <Surveillance />
+          </RequireAuth>
+        }
+      />
+
+      {/* Catch-all */}
+      <Route path="*" element={<Navigate to="/login" replace />} />
+    </Routes>
+  );
 }
 
 function App() {

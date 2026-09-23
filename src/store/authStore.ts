@@ -1,56 +1,184 @@
 import { create } from 'zustand';
-import { login as svcLogin, logout as svcLogout, getCurrentProfile } from '../lib/gameService';
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
+  signOut,
+  onAuthStateChanged,
+  type User,
+} from 'firebase/auth';
+import { auth, getOrCreateUserProfile } from '../lib/firebase';
 import type { Profile } from '../types/game';
 
 interface AuthStore {
   profile: Profile | null;
+  firebaseUser: User | null;
   isLoading: boolean;
   isInitialized: boolean;
 
-  initialize: () => Promise<void>;
-  login: (username: string, password: string) => Promise<{ error?: string }>;
+  initialize: () => void;
+  signInWithEmail: (email: string, password: string) => Promise<{ error?: string }>;
+  signUpWithEmail: (email: string, password: string, callsign?: string) => Promise<{ error?: string }>;
+  signInWithGoogle: () => Promise<{ error?: string }>;
   logout: () => Promise<void>;
   setProfile: (p: Profile | null) => void;
   updateTokens: (tokens: number) => void;
   updateStatus: (status: Profile['status']) => void;
 }
 
-export const useAuthStore = create<AuthStore>((set) => ({
-  profile: null,
-  isLoading: true,
-  isInitialized: false,
-
-  initialize: async () => {
-    set({ isLoading: true });
-    try {
-      const profile = await getCurrentProfile();
-      set({ profile, isLoading: false, isInitialized: true });
-    } catch {
-      set({ profile: null, isLoading: false, isInitialized: true });
+function parseFirebaseError(err: unknown): string {
+  if (typeof err === 'object' && err !== null && 'code' in err) {
+    const code = (err as { code: string }).code;
+    switch (code) {
+      case 'auth/invalid-email':
+        return 'Invalid email address format.';
+      case 'auth/user-not-found':
+        return 'No surveillance account found with this email.';
+      case 'auth/wrong-password':
+      case 'auth/invalid-credential':
+        return 'Invalid email or password.';
+      case 'auth/email-already-in-use':
+        return 'An operator account already exists with this email address.';
+      case 'auth/weak-password':
+        return 'Password is too weak. Must be at least 6 characters.';
+      case 'auth/popup-closed-by-user':
+        return 'Google sign-in popup was closed before completing.';
+      case 'auth/unauthorized-domain':
+        return 'Domain not authorized in Firebase Console (add localhost to Authorized Domains).';
+      case 'auth/operation-not-allowed':
+        return 'Provider disabled. Enable Email/Password or Google in Firebase Console.';
+      default:
+        return (err as { message?: string }).message ?? 'Authentication failed.';
     }
-  },
+  }
+  return 'An unexpected error occurred during authentication.';
+}
 
-  login: async (username, password) => {
-    set({ isLoading: true });
-    const result = await svcLogin(username, password);
-    if ('error' in result) {
-      set({ isLoading: false });
-      return { error: result.error };
-    }
-    set({ profile: result.profile, isLoading: false });
-    return {};
-  },
+let authListenerAttached = false;
 
-  logout: async () => {
-    await svcLogout();
-    set({ profile: null });
-  },
+export const useAuthStore = create<AuthStore>((set, get) => {
+  const attachListener = () => {
+    if (authListenerAttached) return;
+    authListenerAttached = true;
 
-  setProfile: (profile) => set({ profile }),
+    // Safety timeout: never hang forever if Firebase or network is sluggish
+    const timer = setTimeout(() => {
+      if (!get().isInitialized) {
+        set({ isInitialized: true, isLoading: false });
+      }
+    }, 1500);
 
-  updateTokens: (tokens) =>
-    set((state) => (state.profile ? { profile: { ...state.profile, eliminationTokens: tokens } } : {})),
+    onAuthStateChanged(auth, async (user) => {
+      clearTimeout(timer);
+      if (user) {
+        try {
+          const profile = await getOrCreateUserProfile(user.uid, user.email, user.displayName);
+          set({
+            firebaseUser: user,
+            profile,
+            isLoading: false,
+            isInitialized: true,
+          });
+        } catch {
+          set({
+            firebaseUser: user,
+            profile: {
+              id: user.uid,
+              playerId: `SURV-${user.uid.slice(0, 4).toUpperCase()}`,
+              username: user.displayName ?? user.email?.split('@')[0] ?? 'OPERATOR',
+              role: 'SURVEILLANCE',
+              status: 'ACTIVE',
+              eliminationTokens: 0,
+              createdAt: new Date().toISOString(),
+            },
+            isLoading: false,
+            isInitialized: true,
+          });
+        }
+      } else {
+        set({
+          firebaseUser: null,
+          profile: null,
+          isLoading: false,
+          isInitialized: true,
+        });
+      }
+    });
+  };
 
-  updateStatus: (status) =>
-    set((state) => (state.profile ? { profile: { ...state.profile, status } } : {})),
-}));
+  // Attach listener immediately on store creation
+  attachListener();
+
+  return {
+    profile: null,
+    firebaseUser: null,
+    isLoading: true,
+    isInitialized: false,
+
+    initialize: () => {
+      attachListener();
+    },
+
+    signInWithEmail: async (email, password) => {
+      set({ isLoading: true });
+      try {
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+        const profile = await getOrCreateUserProfile(user.uid, user.email, user.displayName);
+        set({ firebaseUser: user, profile, isLoading: false, isInitialized: true });
+        return {};
+      } catch (err) {
+        set({ isLoading: false });
+        return { error: parseFirebaseError(err) };
+      }
+    },
+
+    signUpWithEmail: async (email, password, callsign) => {
+      set({ isLoading: true });
+      try {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+        const profile = await getOrCreateUserProfile(user.uid, user.email, callsign || user.displayName);
+        set({ firebaseUser: user, profile, isLoading: false, isInitialized: true });
+        return {};
+      } catch (err) {
+        set({ isLoading: false });
+        return { error: parseFirebaseError(err) };
+      }
+    },
+
+    signInWithGoogle: async () => {
+      set({ isLoading: true });
+      try {
+        const provider = new GoogleAuthProvider();
+        provider.setCustomParameters({ prompt: 'select_account' });
+        const result = await signInWithPopup(auth, provider);
+        const user = result.user;
+        const profile = await getOrCreateUserProfile(user.uid, user.email, user.displayName);
+        set({ firebaseUser: user, profile, isLoading: false, isInitialized: true });
+        return {};
+      } catch (err) {
+        set({ isLoading: false });
+        return { error: parseFirebaseError(err) };
+      }
+    },
+
+    logout: async () => {
+      try {
+        await signOut(auth);
+      } catch (err) {
+        console.warn('Sign out error:', err);
+      }
+      set({ profile: null, firebaseUser: null, isLoading: false, isInitialized: true });
+    },
+
+    setProfile: (profile) => set({ profile }),
+
+    updateTokens: (tokens) =>
+      set((state) => (state.profile ? { profile: { ...state.profile, eliminationTokens: tokens } } : {})),
+
+    updateStatus: (status) =>
+      set((state) => (state.profile ? { profile: { ...state.profile, status } } : {})),
+  };
+});

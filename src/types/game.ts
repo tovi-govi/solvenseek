@@ -2,8 +2,9 @@
 // Core enums / unions
 // ---------------------------------------------------------------------------
 
-export type UserRole = 'HIDER' | 'SEEKER';
+export type UserRole = 'HIDER' | 'SEEKER' | 'SURVEILLANCE';
 export type UserStatus = 'ACTIVE' | 'ELIMINATED';
+export type ParticipantStatus = 'NOT_FOUND' | 'FOUND' | 'ELIMINATED';
 export type ChallengeDifficulty = 'EASY' | 'MEDIUM' | 'HARD';
 export type GameStatus = 'NOT_STARTED' | 'ACTIVE' | 'ENDED';
 export type ChallengeCategory =
@@ -27,6 +28,7 @@ export interface Profile {
   role: UserRole;
   status: UserStatus;
   eliminationTokens: number;
+  createdAt?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -79,6 +81,53 @@ export interface ActiveHider {
   id: string;
   username: string;
   playerId: string;
+}
+
+// ---------------------------------------------------------------------------
+// Surveillance & Real-Time Seeker Tracking
+// ---------------------------------------------------------------------------
+
+export interface SeekerTelemetry {
+  id: string;
+  playerId: string;          // e.g. S-001
+  name: string;              // e.g. "Echo Agent"
+  zoneId: 'new-west' | 'admin' | 'new-east' | 'corridor';
+  zoneName: string;          // e.g. "New Building (West)", "Admin Block"
+  x: number;                 // Normalized map coordinate (0-1000)
+  y: number;                 // Normalized map coordinate (0-800)
+  battery: number;           // Battery % (e.g. 84)
+  signal: 'STRONG' | 'GOOD' | 'WEAK';
+  status: 'ACTIVE' | 'CLAIMING_ARTIFACT' | 'IN_TRANSIT';
+  speedKmh?: number;
+  qrScannedCount?: number;   // 10 valid / 5 wrong
+  lastPing: number;          // timestamp ms
+}
+
+export interface Participant {
+  id: string;
+  playerId: string;          // e.g. H-014 or S-007
+  name: string;
+  role: 'HIDER' | 'SEEKER';
+  status: ParticipantStatus;
+  foundAt?: number | null;
+  foundBy?: string | null;   // Seeker playerId who found them
+  foundLocation?: string | null;
+  notes?: string;
+  lastUpdated: number;
+}
+
+export interface SeekerBroadcast {
+  id: string;
+  timestamp: number;
+  seekerPositions: {
+    playerId: string;
+    name: string;
+    zoneName: string;
+    x: number;
+    y: number;
+  }[];
+  totalActiveSeekers: number;
+  operator: string;
 }
 
 // ---------------------------------------------------------------------------

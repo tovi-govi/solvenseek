@@ -13,12 +13,15 @@
  */
 
 import { supabase, isMockMode } from './supabase';
+import { getServerNow } from './serverTime';
+import { fetchRealSeekers, saveRealSeeker, subscribeToRealSeekers, subscribeToRealBroadcasts, recordRealBroadcast } from './firebase';
 import {
   MOCK_USERS,
   MOCK_HIDER_CHALLENGES,
   MOCK_SEEKER_CHALLENGES,
   MOCK_ZONES,
-  MOCK_GAME_CONFIG
+  MOCK_GAME_CONFIG,
+  MOCK_PARTICIPANTS,
 } from './mockData';
 import type {
   Profile,
@@ -27,18 +30,25 @@ import type {
   Zone,
   ActiveHider,
   GameConfig,
+  SeekerTelemetry,
+  Participant,
+  SeekerBroadcast,
+  ParticipantStatus,
 } from '../types/game';
 
 // ---------------------------------------------------------------------------
 // Storage Keys
 // ---------------------------------------------------------------------------
-const SESSION_VERSION = 'v2';                            // bump to force re-login
-const SK_SESSION      = `ov_session_${SESSION_VERSION}`; // stores profile id
-const SK_USERNAME     = `ov_username_${SESSION_VERSION}`;// stores username for unambiguous lookup
-const SK_ELIMINATED   = 'ov_eliminated';                 // JSON array of eliminated profile ids
-const SK_SOLVED_H     = (id: string) => `ov_h_solved_${id}`;
-const SK_SOLVED_S     = (id: string) => `ov_s_solved_${id}`;
-const SK_TOKENS       = (id: string) => `ov_tokens_${id}`;
+const SESSION_VERSION   = 'v2';                            // bump to force re-login
+const SK_SESSION        = `ov_session_${SESSION_VERSION}`; // stores profile id
+const SK_USERNAME       = `ov_username_${SESSION_VERSION}`;// stores username for unambiguous lookup
+const SK_ELIMINATED     = 'ov_eliminated';                 // JSON array of eliminated profile ids
+const SK_SOLVED_H       = (id: string) => `ov_h_solved_${id}`;
+const SK_SOLVED_S       = (id: string) => `ov_s_solved_${id}`;
+const SK_TOKENS         = (id: string) => `ov_tokens_${id}`;
+const SK_PARTICIPANTS   = 'ov_participants';
+const SK_BROADCAST_HIST = 'ov_broadcast_history';
+const SK_LAST_BROADCAST = 'ov_last_broadcast_ts';
 
 // ---------------------------------------------------------------------------
 // BroadcastChannel for cross-tab realtime (mock mode only)
@@ -53,7 +63,10 @@ function getChannel(): BroadcastChannel {
 type RealtimeEvent =
   | { type: 'PLAYER_ELIMINATED'; targetId: string }
   | { type: 'TOKENS_UPDATED';   profileId: string; tokens: number }
-  | { type: 'CHALLENGE_SOLVED'; challengeId: string; profileId: string };
+  | { type: 'CHALLENGE_SOLVED'; challengeId: string; profileId: string }
+  | { type: 'SEEKER_POSITIONS_BROADCAST'; broadcast: SeekerBroadcast }
+  | { type: 'PARTICIPANTS_UPDATED'; participants: Participant[] }
+  | { type: 'SEEKER_TELEMETRY_UPDATED'; telemetry: SeekerTelemetry[] };
 
 function broadcast(event: RealtimeEvent) {
   getChannel().postMessage(event);
@@ -590,6 +603,146 @@ export function subscribeToActiveTargetsChanges(onUpdate: () => void): () => voi
     .subscribe();
 
   return () => { supabase!.removeChannel(sub); };
+}
+
+// ---------------------------------------------------------------------------
+// SURVEILLANCE & REAL-TIME SEEKER POSITIONS
+// ---------------------------------------------------------------------------
+
+export async function getSeekerTelemetry(): Promise<SeekerTelemetry[]> {
+  const realSeekers = await fetchRealSeekers();
+  return realSeekers;
+}
+
+export async function updateSeekerTelemetry(telemetry: SeekerTelemetry[]): Promise<void> {
+  for (const s of telemetry) {
+    await saveRealSeeker(s);
+  }
+}
+
+export function subscribeToSeekerTelemetry(
+  onUpdate: (telemetry: SeekerTelemetry[]) => void
+): () => void {
+  return subscribeToRealSeekers(onUpdate);
+}
+
+export async function broadcastSeekerPositions(
+  operator: string = 'Surveillance HQ'
+): Promise<{ success: boolean; broadcast: SeekerBroadcast; error?: string }> {
+  const telemetry = await getSeekerTelemetry();
+  const activeSeekers = telemetry.filter((s) => s.status !== 'IN_TRANSIT' || true);
+  const serverNow = getServerNow();
+
+  const payload: SeekerBroadcast = {
+    id: `bc-${serverNow}`,
+    timestamp: serverNow,
+    seekerPositions: activeSeekers.map((s) => ({
+      playerId: s.playerId,
+      name: s.name,
+      zoneName: s.zoneName,
+      x: s.x,
+      y: s.y,
+    })),
+    totalActiveSeekers: activeSeekers.length,
+    operator,
+  };
+
+  await recordRealBroadcast(payload);
+  return { success: true, broadcast: payload };
+}
+
+export async function getLastBroadcast(): Promise<SeekerBroadcast | null> {
+  try {
+    const raw = localStorage.getItem(SK_LAST_BROADCAST);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function getBroadcastHistory(): Promise<SeekerBroadcast[]> {
+  try {
+    return JSON.parse(localStorage.getItem(SK_BROADCAST_HIST) ?? '[]');
+  } catch {
+    return [];
+  }
+}
+
+export function subscribeToSeekerBroadcasts(
+  onBroadcast: (broadcast: SeekerBroadcast) => void
+): () => void {
+  return subscribeToRealBroadcasts((_history, latest) => {
+    if (latest) onBroadcast(latest);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// FOUND / NOT FOUND PARTICIPANTS MANAGEMENT
+// ---------------------------------------------------------------------------
+
+export async function getParticipants(): Promise<Participant[]> {
+  try {
+    const raw = localStorage.getItem(SK_PARTICIPANTS);
+    if (raw) return JSON.parse(raw);
+  } catch {
+    // fallback
+  }
+  localStorage.setItem(SK_PARTICIPANTS, JSON.stringify(MOCK_PARTICIPANTS));
+  return MOCK_PARTICIPANTS;
+}
+
+export async function updateParticipantStatus(
+  id: string,
+  status: ParticipantStatus,
+  metadata?: { foundBy?: string; foundLocation?: string; notes?: string }
+): Promise<{ success: boolean; updated?: Participant; error?: string }> {
+  const list = await getParticipants();
+  const index = list.findIndex((p) => p.id === id);
+  if (index === -1) return { success: false, error: 'Participant not found' };
+
+  const updated: Participant = {
+    ...list[index],
+    status,
+    foundAt: status === 'FOUND' || status === 'ELIMINATED' ? (metadata?.foundBy ? Date.now() : list[index].foundAt ?? Date.now()) : null,
+    foundBy: metadata?.foundBy ?? list[index].foundBy,
+    foundLocation: metadata?.foundLocation ?? list[index].foundLocation,
+    notes: metadata?.notes ?? list[index].notes,
+    lastUpdated: Date.now(),
+  };
+
+  list[index] = updated;
+  localStorage.setItem(SK_PARTICIPANTS, JSON.stringify(list));
+  broadcast({ type: 'PARTICIPANTS_UPDATED', participants: list });
+
+  return { success: true, updated };
+}
+
+export async function addParticipant(
+  item: Omit<Participant, 'id' | 'lastUpdated'>
+): Promise<Participant> {
+  const list = await getParticipants();
+  const newPart: Participant = {
+    ...item,
+    id: `part-${Date.now()}`,
+    lastUpdated: Date.now(),
+  };
+  list.push(newPart);
+  localStorage.setItem(SK_PARTICIPANTS, JSON.stringify(list));
+  broadcast({ type: 'PARTICIPANTS_UPDATED', participants: list });
+  return newPart;
+}
+
+export function subscribeToParticipantUpdates(
+  onUpdate: (participants: Participant[]) => void
+): () => void {
+  const ch = getChannel();
+  const handler = (event: MessageEvent<RealtimeEvent>) => {
+    if (event.data.type === 'PARTICIPANTS_UPDATED') {
+      onUpdate(event.data.participants);
+    }
+  };
+  ch.addEventListener('message', handler);
+  return () => ch.removeEventListener('message', handler);
 }
 
 // ---------------------------------------------------------------------------

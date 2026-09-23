@@ -1,288 +1,242 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import gsap from 'gsap';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '../store/authStore';
-import { isMockMode } from '../lib/supabase';
-import RippleGrid from '../components/ui/RippleGrid';
+import {
+  Lock,
+  Mail,
+  ArrowRight,
+  AlertTriangle,
+  Radio,
+  ExternalLink,
+} from 'lucide-react';
 
 export function Login() {
   const navigate = useNavigate();
-  const { login, profile } = useAuthStore();
+  const { signInWithEmail, signInWithGoogle, isLoading } = useAuthStore();
 
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [bootDone, setBootDone] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [authInProgress, setAuthInProgress] = useState(false);
 
-  // Refs for GSAP
-  const logoRef       = useRef<HTMLDivElement>(null);
-  const subtitleRef   = useRef<HTMLDivElement>(null);
-  const badgeRef      = useRef<HTMLDivElement>(null);
-  const dividerRef    = useRef<HTMLDivElement>(null);
-  const formRef       = useRef<HTMLDivElement>(null);
-  const statusRef     = useRef<HTMLDivElement>(null);
-  const scanlineRef   = useRef<HTMLDivElement>(null);
-
-  // If already logged in, redirect immediately
-  useEffect(() => {
-    if (profile) {
-      if (profile.status === 'ELIMINATED') navigate('/eliminated', { replace: true });
-      else if (profile.role === 'HIDER') navigate('/hider', { replace: true });
-      else navigate('/seeker', { replace: true });
-    }
-  }, [profile, navigate]);
-
-  // GSAP boot animation
-  useEffect(() => {
-    const tl = gsap.timeline({ onComplete: () => setBootDone(true) });
-
-    // Start everything invisible
-    gsap.set([logoRef.current, subtitleRef.current, badgeRef.current,
-               dividerRef.current, formRef.current, statusRef.current], {
-      autoAlpha: 0,
-    });
-    gsap.set(scanlineRef.current, { scaleY: 0, transformOrigin: 'top center' });
-
-    tl
-      // Scanline sweep
-      .to(scanlineRef.current, { scaleY: 1, duration: 0.6, ease: 'power2.in' })
-      .to(scanlineRef.current, { autoAlpha: 0, duration: 0.3 })
-      // Logo appears with glitch
-      .to(logoRef.current, { autoAlpha: 1, duration: 0.05 }, '<')
-      .to(logoRef.current, { x: -4, duration: 0.05 })
-      .to(logoRef.current, { x: 4, duration: 0.05 })
-      .to(logoRef.current, { x: 0, duration: 0.05 })
-      // Subtitle
-      .to(subtitleRef.current, { autoAlpha: 1, y: 0, duration: 0.4, ease: 'power2.out' }, '-=0.1')
-      // Badge
-      .to(badgeRef.current, { autoAlpha: 1, duration: 0.3, ease: 'power2.out' }, '+=0.1')
-      // Divider draws
-      .to(dividerRef.current, { autoAlpha: 1, scaleX: 1, transformOrigin: 'left', duration: 0.5, ease: 'power2.inOut' }, '+=0.05')
-      // Form panel
-      .to(formRef.current, { autoAlpha: 1, y: 0, duration: 0.5, ease: 'power2.out' }, '-=0.2')
-      // Status
-      .to(statusRef.current, { autoAlpha: 1, duration: 0.4 }, '-=0.1');
-
-    return () => { tl.kill(); };
-  }, []);
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!username || !password) return;
-    setError('');
-    setIsSubmitting(true);
+    setErrorMessage(null);
 
-    const result = await login(username, password);
-    setIsSubmitting(false);
-
-    if (result.error) {
-      setError(result.error);
-      // Glitch the form on error
-      gsap.to(formRef.current, {
-        x: 'random(-8,8)', duration: 0.04, repeat: 7, yoyo: true,
-        onComplete: () => gsap.set(formRef.current, { x: 0 }),
-      });
+    if (!email || !password) {
+      setErrorMessage('Please fill in all required credentials.');
       return;
     }
 
-    // Redirect is handled by the profile useEffect above
+    setAuthInProgress(true);
+
+    try {
+      const result = await signInWithEmail(email, password);
+      if (result.error) {
+        setErrorMessage(result.error);
+      } else {
+        navigate('/');
+      }
+    } finally {
+      setAuthInProgress(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setErrorMessage(null);
+    setAuthInProgress(true);
+    try {
+      const result = await signInWithGoogle();
+      if (result.error) {
+        setErrorMessage(result.error);
+      } else {
+        navigate('/');
+      }
+    } finally {
+      setAuthInProgress(false);
+    }
   };
 
   return (
-    <div className="relative w-screen h-screen bg-black overflow-hidden flex items-center justify-center font-mono">
-      {/* Background grid */}
-      <div className="absolute inset-0 z-0 pointer-events-auto">
-        <RippleGrid
-          enableRainbow={false}
-          gridColor="#00ffcc"
-          rippleIntensity={0.05}
-          gridSize={10}
-          gridThickness={15}
-          mouseInteraction={true}
-          mouseInteractionRadius={1.2}
-          opacity={0.3}
-        />
-      </div>
-
-      {/* Ambient corner glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-cyber-accent/5 blur-[120px] pointer-events-none" />
-
-      {/* Scanline sweep element */}
-      <div
-        ref={scanlineRef}
-        className="absolute inset-0 bg-gradient-to-b from-transparent via-cyber-accent/20 to-transparent pointer-events-none z-50"
+    <div className="relative min-h-screen w-screen bg-[#02050e] text-white font-mono flex flex-col items-center justify-center p-4 overflow-hidden select-none">
+      {/* Background Cyber Grid Lines */}
+      <div 
+        className="absolute inset-0 pointer-events-none opacity-20"
+        style={{
+          backgroundImage: `
+            linear-gradient(to right, rgba(0, 240, 255, 0.1) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(0, 240, 255, 0.1) 1px, transparent 1px)
+          `,
+          backgroundSize: '40px 40px',
+        }}
       />
 
-      {/* Content column */}
-      <div className="relative z-10 w-full max-w-md px-6 flex flex-col items-center gap-6">
-        {/* LOGO */}
-        <div ref={logoRef} className="text-center" style={{ opacity: 0 }}>
-          <p className="text-cyber-muted text-[11px] tracking-[0.4em] mb-3 uppercase">
-            OpenVerse Presents
-          </p>
-          <h1
-            className="text-5xl md:text-7xl font-bold text-white tracking-tight leading-none"
-            style={{ textShadow: '0 0 30px rgba(0,255,204,0.4), 0 0 60px rgba(0,255,204,0.15)' }}
-          >
-            HIDE{' '}
-            <span className="text-cyber-accent">//</span>
-            {' '}SEEK
-          </h1>
-        </div>
+      {/* Radial Glow Underlay */}
+      <div className="absolute w-[600px] h-[600px] rounded-full bg-cyber-accent/5 blur-[120px] pointer-events-none" />
 
-        {/* SUBTITLE */}
-        <div ref={subtitleRef} className="text-center" style={{ opacity: 0, transform: 'translateY(8px)' }}>
-          <span className="text-cyber-accent font-mono tracking-[0.3em] text-sm border border-cyber-accent/30 bg-cyber-accent/10 px-4 py-1 inline-block">
-            CAMPUS PROTOCOL
-          </span>
-        </div>
+      {/* Main Authentication Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="relative z-10 w-full max-w-md bg-[#050b18]/90 border border-cyber-accent/30 rounded-sm p-6 shadow-[0_0_35px_rgba(0,240,255,0.08)] backdrop-blur-md"
+      >
+        {/* Top Tactical Status Header */}
+        <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-5">
+          <div className="flex items-center gap-2">
+            <Radio className="w-4 h-4 text-cyber-accent animate-pulse" />
+            <span className="text-[11px] font-bold tracking-widest text-cyber-accent uppercase">
+              SECURITY ACCESS NODE // PORT 443
+            </span>
+          </div>
 
-        {/* DIVIDER */}
-        <div
-          ref={dividerRef}
-          className="w-full h-px bg-gradient-to-r from-transparent via-cyber-border to-transparent"
-          style={{ opacity: 0, transform: 'scaleX(0)' }}
-        />
-
-        {/* FORM PANEL */}
-        <div
-          ref={formRef}
-          className="w-full relative bg-[#080808]/90 border border-cyber-border backdrop-blur-sm"
-          style={{ opacity: 0, transform: 'translateY(12px)' }}
-        >
-          {/* Corner accents */}
-          <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-cyber-accent" />
-          <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-cyber-accent" />
-          <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-cyber-accent" />
-          <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-cyber-accent" />
-
-          <div className="p-7 flex flex-col gap-6">
-            <div className="text-center">
-              <p className="text-cyber-muted text-[10px] tracking-[0.4em] uppercase">
-                IDENTIFICATION REQUIRED
-              </p>
-            </div>
-
-            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-              {/* Username */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] tracking-[0.35em] text-cyber-muted uppercase">
-                  Username
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-cyber-accent/50 text-sm">›</span>
-                  <input
-                    id="login-username"
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder={isMockMode ? 'hider1 / seeker1' : 'USERNAME'}
-                    autoComplete="username"
-                    className="w-full bg-black border border-cyber-border text-white font-mono text-sm pl-7 pr-4 py-3 focus:outline-none focus:border-cyber-accent focus:bg-cyber-accent/5 transition-colors placeholder:text-[#444] uppercase tracking-wider"
-                  />
-                </div>
-              </div>
-
-              {/* Password */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] tracking-[0.35em] text-cyber-muted uppercase">
-                  Password
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-cyber-accent/50 text-sm">›</span>
-                  <input
-                    id="login-password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    autoComplete="current-password"
-                    className="w-full bg-black border border-cyber-border text-white font-mono text-sm pl-7 pr-4 py-3 focus:outline-none focus:border-cyber-accent focus:bg-cyber-accent/5 transition-colors placeholder:text-[#444]"
-                  />
-                </div>
-              </div>
-
-              {/* Error */}
-              <AnimatePresence>
-                {error && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                    className="bg-cyber-warning/10 border border-cyber-warning/50 text-cyber-warning text-xs px-3 py-2 uppercase tracking-wider flex items-center gap-2"
-                  >
-                    <span className="w-1.5 h-1.5 bg-cyber-warning rounded-full animate-pulse" />
-                    {error}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Submit */}
-              <button
-                id="login-submit"
-                type="submit"
-                disabled={isSubmitting || !username || !password}
-                className="relative w-full bg-cyber-accent/10 border border-cyber-accent text-cyber-accent font-mono text-sm tracking-[0.3em] py-3 uppercase hover:bg-cyber-accent/20 hover:shadow-[0_0_20px_rgba(0,255,204,0.2)] transition-all disabled:opacity-40 disabled:cursor-not-allowed mt-1 group overflow-hidden"
-              >
-                <span className="relative z-10">
-                  {isSubmitting ? 'AUTHENTICATING...' : 'CONNECT'}
-                </span>
-                {/* scan line on hover */}
-                <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full bg-gradient-to-r from-transparent via-cyber-accent/10 to-transparent transition-transform duration-700 ease-in-out" />
-              </button>
-            </form>
-
-            {/* Demo credentials */}
-            {isMockMode && bootDone && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.5 }}
-                className="border border-cyber-border/40 bg-cyber-accent/3 p-3 flex flex-col gap-1.5"
-              >
-                <p className="text-[9px] tracking-widest text-cyber-muted uppercase border-b border-cyber-border/30 pb-1.5 mb-1">
-                  Demo Credentials (Mock Mode)
-                </p>
-                {[
-                  { role: 'HIDER',  u: 'hider1',  p: 'hide123' },
-                  { role: 'SEEKER', u: 'seeker1', p: 'seek123' },
-                ].map(({ role, u, p }) => (
-                  <button
-                    key={u}
-                    onClick={() => { setUsername(u); setPassword(p); }}
-                    className="text-left flex items-center gap-2 text-[10px] font-mono hover:text-white transition-colors group"
-                  >
-                    <span className={`text-[9px] tracking-widest px-1.5 py-0.5 border ${role === 'HIDER' ? 'text-cyber-accent border-cyber-accent/40' : 'text-[#00ff41] border-[#00ff41]/40'}`}>
-                      {role}
-                    </span>
-                    <span className="text-cyber-muted group-hover:text-cyber-text">
-                      {u} / {p}
-                    </span>
-                  </button>
-                ))}
-              </motion.div>
-            )}
+          <div className="flex items-center gap-1.5 text-[9px] text-cyber-success bg-cyber-success/10 border border-cyber-success/30 px-2 py-0.5 rounded">
+            <span className="w-1.5 h-1.5 rounded-full bg-cyber-success animate-ping" />
+            <span>ONLINE</span>
           </div>
         </div>
 
-        {/* STATUS INDICATORS */}
-        <div
-          ref={statusRef}
-          className="w-full flex justify-between text-[10px] tracking-widest text-cyber-muted uppercase"
-          style={{ opacity: 0 }}
-        >
-          {[
-            { label: 'SYSTEM', value: 'ONLINE', ok: true },
-            { label: 'NETWORK', value: 'SECURE', ok: true },
-            { label: 'GAME', value: 'ACTIVE', ok: true },
-          ].map(({ label, value, ok }) => (
-            <div key={label} className="flex items-center gap-1.5">
-              <span className={`w-1.5 h-1.5 rounded-full ${ok ? 'bg-cyber-success animate-pulse' : 'bg-cyber-warning'}`} />
-              <span>{label}: <span className={ok ? 'text-cyber-success' : 'text-cyber-warning'}>{value}</span></span>
+        {/* Title & Brand */}
+        <div className="mb-6">
+          <div className="text-xl font-black tracking-wider text-white flex items-center gap-2 font-display">
+            <span>OPENVERSE</span>
+            <span className="text-cyber-accent">// SURVEILLANCE</span>
+          </div>
+          <p className="text-xs text-cyber-muted mt-1">
+            Team Command Center Authorization Portal
+          </p>
+          <div className="mt-2 text-[10px] text-[#ffd700] bg-[#ffd700]/10 border border-[#ffd700]/25 px-2 py-1 rounded flex items-center justify-between">
+            <span>FIREBASE PROJECT: <b>cmiyc-d170c</b></span>
+            <span className="text-white/60">AUTH & DB</span>
+          </div>
+        </div>
+
+        {/* Error Alert Banner */}
+        <AnimatePresence>
+          {errorMessage && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mb-4 p-2.5 rounded bg-[#ff0033]/10 border border-[#ff0033]/40 text-[#ff0033] text-[11px] flex items-start gap-2 overflow-hidden"
+            >
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <div className="flex-1 leading-tight">
+                <span className="font-bold">AUTH ERROR:</span> {errorMessage}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Form Inputs */}
+        <form onSubmit={handleSubmit} className="space-y-3.5">
+          <div>
+            <label className="block text-[10px] text-cyber-muted uppercase tracking-wider mb-1">
+              SURVEILLANCE EMAIL
+            </label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-2.5 w-4 h-4 text-cyber-accent/60" />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="operator@openverse.net"
+                required
+                className="w-full bg-black/60 border border-white/15 rounded px-3 py-2 pl-9 text-xs text-white placeholder-white/20 focus:border-cyber-accent focus:outline-none transition-colors"
+              />
             </div>
-          ))}
+          </div>
+
+          <div>
+            <label className="block text-[10px] text-cyber-muted uppercase tracking-wider mb-1">
+              ENCRYPTION KEY (PASSWORD)
+            </label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-2.5 w-4 h-4 text-cyber-accent/60" />
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••••••"
+                required
+                className="w-full bg-black/60 border border-white/15 rounded px-3 py-2 pl-9 text-xs text-white placeholder-white/20 focus:border-cyber-accent focus:outline-none transition-colors"
+              />
+            </div>
+          </div>
+
+          {/* Submit Button */}
+          <button
+            type="submit"
+            disabled={authInProgress || isLoading}
+            className="w-full mt-2 bg-cyber-accent hover:bg-cyber-accent/90 text-black font-bold py-2.5 rounded text-xs tracking-widest uppercase transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(0,240,255,0.25)] disabled:opacity-50"
+          >
+            {authInProgress ? (
+              <span>AUTHENTICATING NODE...</span>
+            ) : (
+              <>
+                <span>AUTHORIZE ACCESS</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </>
+            )}
+          </button>
+        </form>
+
+        {/* Divider */}
+        <div className="relative my-4 flex items-center justify-center">
+          <div className="border-t border-white/10 w-full" />
+          <span className="bg-[#050b18] px-2 text-[10px] text-cyber-muted absolute uppercase">
+            OR AUTHENTICATE VIA
+          </span>
+        </div>
+
+        {/* Google OAuth Button */}
+        <button
+          type="button"
+          onClick={handleGoogleSignIn}
+          disabled={authInProgress || isLoading}
+          className="w-full bg-white/5 hover:bg-white/10 border border-white/15 text-white/90 text-xs py-2 rounded transition-colors flex items-center justify-center gap-2 font-mono disabled:opacity-50"
+        >
+          {/* Custom Google G SVG icon */}
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24">
+            <path
+              fill="#4285F4"
+              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+            />
+            <path
+              fill="#34A853"
+              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+            />
+            <path
+              fill="#FBBC05"
+              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+            />
+            <path
+              fill="#EA4335"
+              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+            />
+          </svg>
+          <span>CONTINUE WITH GOOGLE</span>
+        </button>
+      </motion.div>
+
+      {/* Footer Info */}
+      <div className="relative z-10 mt-6 text-center text-[10px] text-cyber-muted space-y-1">
+        <p>OPENVERSE SURVEILLANCE SUITE // FIREBASE BACKEND INTEGRATED</p>
+        <div className="flex items-center justify-center gap-3 text-cyber-accent/70">
+          <span className="flex items-center gap-1">
+            <span>Project: cmiyc-d170c</span>
+          </span>
+          <span>•</span>
+          <a
+            href="https://console.firebase.google.com/project/cmiyc-d170c/authentication"
+            target="_blank"
+            rel="noreferrer"
+            className="hover:underline flex items-center gap-1 text-cyber-accent"
+          >
+            <span>Firebase Console</span>
+            <ExternalLink className="w-2.5 h-2.5" />
+          </a>
         </div>
       </div>
     </div>

@@ -1,4 +1,4 @@
-import type { Profile, HiderChallenge, SeekerChallenge, Zone, ActiveHider, GameConfig } from '../types/game';
+import type { Profile, HiderChallenge, SeekerChallenge, Zone, ActiveHider, GameConfig, SeekerTelemetry, Participant } from '../types/game';
 
 // ---------------------------------------------------------------------------
 // Mock Users  (username → credentials + profile)
@@ -40,6 +40,17 @@ export const MOCK_USERS: Record<string, MockUser> = {
       role: 'HIDER',
       status: 'ACTIVE',
       eliminationTokens: 0,
+    },
+  },
+  team: {
+    password: 'team123',
+    profile: {
+      id: 'mock-team-surveillance',
+      username: 'team',
+      playerId: 'HQ-SURV',
+      role: 'SURVEILLANCE',
+      status: 'ACTIVE',
+      eliminationTokens: 99,
     },
   },
   seeker1: {
@@ -238,3 +249,13 @@ export function getMockActiveSeekers(eliminatedIds: string[]): ActiveHider[] {
       playerId: u.profile.playerId,
     }));
 }
+
+// ---------------------------------------------------------------------------
+// Seeker Telemetry (Real-time data ingested from React Native mobile app & Firestore)
+// ---------------------------------------------------------------------------
+export const MOCK_SEEKERS_TELEMETRY: SeekerTelemetry[] = [];
+
+// ---------------------------------------------------------------------------
+// Participants Roster (Loaded from Firestore)
+// ---------------------------------------------------------------------------
+export const MOCK_PARTICIPANTS: Participant[] = [];

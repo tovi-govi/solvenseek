@@ -48,7 +48,7 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
         <GlitchText text="ACCESS DENIED" active className="text-4xl text-cyber-warning font-display font-bold mb-4 tracking-widest" />
         <p className="text-cyber-muted tracking-widest uppercase mb-8">Role Mismatch — Unauthorized Territory</p>
         <button 
-          onClick={() => window.location.href = profile.role === 'HIDER' ? '/hider' : '/seeker'}
+          onClick={() => window.location.href = profile.role === 'SURVEILLANCE' ? '/surveillance' : profile.role === 'HIDER' ? '/hider' : '/seeker'}
           className="px-6 py-3 border border-cyber-accent text-cyber-accent hover:bg-cyber-accent hover:text-black transition-colors uppercase tracking-widest text-sm font-bold"
         >
           Return to {profile.role} Network
