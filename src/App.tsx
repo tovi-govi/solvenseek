@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/authStore';
 import { Surveillance } from './pages/Surveillance';
+import { Hider } from './pages/Hider';
 import { Login } from './pages/Login';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -76,6 +77,14 @@ function AppRoutes() {
         element={
           <RequireAuth>
             <Surveillance />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/hider"
+        element={
+          <RequireAuth>
+            <Hider />
           </RequireAuth>
         }
       />

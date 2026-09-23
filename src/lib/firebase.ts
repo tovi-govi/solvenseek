@@ -13,9 +13,10 @@ import {
   limit,
   serverTimestamp,
   getDocs,
+  runTransaction,
 } from 'firebase/firestore';
 import { getAnalytics, isSupported } from 'firebase/analytics';
-import type { Profile, SeekerTelemetry, SeekerBroadcast } from '../types/game';
+import type { Profile, SeekerTelemetry, SeekerBroadcast, Challenge, ChallengeSolveResult } from '../types/game';
 import { getServerNow } from './serverTime';
 
 // Firebase configuration provided by user
@@ -250,4 +251,257 @@ export async function recordRealBroadcast(broadcast: SeekerBroadcast): Promise<v
     cycleMinutes: 10,
     totalActiveSeekers: broadcast.totalActiveSeekers,
   });
+}
+
+// ---------------------------------------------------------------------------
+// Hider Challenges — Shared Pool with Atomic First-Solve Lockout
+// ---------------------------------------------------------------------------
+
+export const INITIAL_FILLER_CHALLENGES: Omit<Challenge, 'solvedBy' | 'solvedAt'>[] = [
+  {
+    id: 'ch-01',
+    title: 'ANOMALY_01: Packet Intercept',
+    description: 'Analyze the intercepted radio burst:\n\n> T3BlblZlcnNlIENURg==\n\nDecode the payload string.',
+    category: 'CRYPTOGRAPHY',
+    difficulty: 'EASY',
+    points: 50,
+    tokensAwarded: 1,
+    answer: 'openverse ctf',
+    hints: ['Standard Base64 encoding.', 'Case-insensitive string.'],
+    isSolved: false,
+    order: 1,
+  },
+  {
+    id: 'ch-02',
+    title: 'ANOMALY_02: Bitwise Logic Gate',
+    description: 'Compute the bitwise XOR operation:\n\n> 0b10110101 XOR 0b11001010\n\nEnter the resulting value as an integer.',
+    category: 'LOGIC',
+    difficulty: 'MEDIUM',
+    points: 100,
+    tokensAwarded: 1,
+    answer: '127',
+    hints: ['Perform XOR column by column.', 'Convert binary result to base 10.'],
+    isSolved: false,
+    order: 2,
+  },
+  {
+    id: 'ch-03',
+    title: 'ANOMALY_03: HTTP Protocol Diagnostic',
+    description: 'What standard 3-digit HTTP status code signifies that the requested endpoint is missing or not found on the server?',
+    category: 'NETWORK',
+    difficulty: 'EASY',
+    points: 50,
+    tokensAwarded: 1,
+    answer: '404',
+    hints: ['Client error response.', 'Classic 4XX status code.'],
+    isSolved: false,
+    order: 3,
+  },
+  {
+    id: 'ch-04',
+    title: 'ANOMALY_04: Terminal Shell Inspection',
+    description: 'Provide the exact Linux command to list all files in the current directory including hidden files in long listing format.',
+    category: 'LINUX',
+    difficulty: 'EASY',
+    points: 50,
+    tokensAwarded: 1,
+    answer: 'ls -la|ls -al',
+    hints: ['Flags include listing and all.', 'Either "ls -la" or "ls -al".'],
+    isSolved: false,
+    order: 4,
+  },
+  {
+    id: 'ch-05',
+    title: 'ANOMALY_05: Cryptographic Hash Cracking',
+    description: 'The MD5 hash of an administrator password was extracted:\n\n> 5f4dcc3b5aa765d61d8327deb882cf99\n\nWhat is the decrypted plain text password?',
+    category: 'CRYPTOGRAPHY',
+    difficulty: 'HARD',
+    points: 200,
+    tokensAwarded: 2,
+    answer: 'password',
+    hints: ['One of the most common passwords in history.', '8 characters lowercase.'],
+    isSolved: false,
+    order: 5,
+  },
+  {
+    id: 'ch-06',
+    title: 'ANOMALY_06: Network Port Authority',
+    description: 'Which default port number is used for encrypted Transport Layer Security (TLS/HTTPS) web communication?',
+    category: 'NETWORK',
+    difficulty: 'EASY',
+    points: 50,
+    tokensAwarded: 1,
+    answer: '443',
+    hints: ['HTTP is 80; HTTPS is ?', 'Three digits.'],
+    isSolved: false,
+    order: 6,
+  },
+  {
+    id: 'ch-07',
+    title: 'ANOMALY_07: Shift Cipher Decryption',
+    description: 'A Caesar cipher with a +3 right shift produced the ciphertext:\n\n> FDPSXV\n\nDecrypt to uncover the plain keyword.',
+    category: 'CRYPTOGRAPHY',
+    difficulty: 'MEDIUM',
+    points: 100,
+    tokensAwarded: 1,
+    answer: 'campus',
+    hints: ['Shift each character backwards by 3 letters in the alphabet.', 'F (-3) -> C'],
+    isSolved: false,
+    order: 7,
+  },
+  {
+    id: 'ch-08',
+    title: 'ANOMALY_08: OSINT Project Milestone',
+    description: 'Enter the founding milestone year recorded in the OpenVerse project archives.',
+    category: 'OSINT',
+    difficulty: 'MEDIUM',
+    points: 100,
+    tokensAwarded: 1,
+    answer: '2024',
+    hints: ['Check the primary open-source repo creation date.'],
+    isSolved: false,
+    order: 8,
+  },
+];
+
+/**
+ * Normalizes candidate answer and tests against official answer (supports pipe-separated variants)
+ */
+function checkAnswerMatch(candidate: string, official: string): boolean {
+  const normCandidate = candidate.trim().toLowerCase().replace(/\s+/g, ' ');
+  const options = official.split('|').map((o) => o.trim().toLowerCase().replace(/\s+/g, ' '));
+  return options.includes(normCandidate);
+}
+
+/**
+ * Seeds default filler challenges into Firestore if the collection is currently empty
+ */
+export async function seedDefaultChallengesIfEmpty(): Promise<void> {
+  try {
+    const colRef = collection(db, 'challenges');
+    const snap = await getDocs(colRef);
+    if (!snap.empty) {
+      return; // Already seeded
+    }
+
+    for (const ch of INITIAL_FILLER_CHALLENGES) {
+      await setDoc(doc(db, 'challenges', ch.id), {
+        ...ch,
+        solvedBy: null,
+        solvedAt: null,
+        createdAt: serverTimestamp(),
+      });
+    }
+  } catch (err) {
+    console.warn('Could not seed challenges to Firestore:', err);
+  }
+}
+
+/**
+ * Real-time listener for the shared challenge pool
+ */
+export function subscribeToRealChallenges(
+  onUpdate: (challenges: Challenge[]) => void
+): () => void {
+  try {
+    const q = query(collection(db, 'challenges'), orderBy('order', 'asc'));
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const list: Challenge[] = snap.docs.map((d) => {
+          const data = d.data();
+          return {
+            id: d.id,
+            title: data.title ?? 'CHALLENGE ANOMALY',
+            description: data.description ?? '',
+            category: data.category ?? 'LOGIC',
+            difficulty: data.difficulty ?? 'MEDIUM',
+            points: Number(data.points ?? 100),
+            tokensAwarded: Number(data.tokensAwarded ?? 1),
+            answer: data.answer ?? '',
+            hints: Array.isArray(data.hints) ? data.hints : [],
+            isSolved: Boolean(data.isSolved),
+            solvedBy: data.solvedBy ?? null,
+            solvedAt: data.solvedAt ?? null,
+            order: Number(data.order ?? 0),
+          };
+        });
+        onUpdate(list);
+      },
+      (err) => {
+        console.warn('Realtime challenges subscription error:', err);
+      }
+    );
+    return unsub;
+  } catch (err) {
+    console.warn('Could not subscribe to challenges:', err);
+    return () => {};
+  }
+}
+
+/**
+ * Atomically submit an answer for a challenge using a Firestore transaction.
+ * First-solve locks out all other players grid-wide.
+ */
+export async function submitChallengeAnswerAtomic(
+  profile: Profile,
+  challengeId: string,
+  candidateAnswer: string
+): Promise<ChallengeSolveResult> {
+  const challengeDocRef = doc(db, 'challenges', challengeId);
+  const userDocRef = doc(db, 'users', profile.id);
+
+  try {
+    const result = await runTransaction(db, async (transaction) => {
+      const chSnap = await transaction.get(challengeDocRef);
+      if (!chSnap.exists()) {
+        return { success: false, tokensGranted: 0, error: 'CHALLENGE_NOT_FOUND' };
+      }
+
+      const chData = chSnap.data() as Partial<Challenge>;
+      if (chData.isSolved) {
+        return {
+          success: false,
+          tokensGranted: 0,
+          error: 'CHALLENGE_ALREADY_CLAIMED',
+          alreadySolvedBy: chData.solvedBy?.playerId ?? chData.solvedBy?.username ?? 'ANOTHER OPERATIVE',
+        };
+      }
+
+      const officialAnswer = String(chData.answer ?? '');
+      if (!checkAnswerMatch(candidateAnswer, officialAnswer)) {
+        return { success: false, tokensGranted: 0, error: 'INVALID_ANSWER' };
+      }
+
+      // Correct answer! Atomically lock this challenge
+      const awarded = Number(chData.tokensAwarded ?? 1);
+      transaction.update(challengeDocRef, {
+        isSolved: true,
+        solvedBy: {
+          uid: profile.id,
+          playerId: profile.playerId,
+          username: profile.username,
+        },
+        solvedAt: Date.now(),
+      });
+
+      // Atomically award tokens to the player
+      const userSnap = await transaction.get(userDocRef);
+      const currentTokens = Number(userSnap.data()?.eliminationTokens ?? profile.eliminationTokens ?? 0);
+      transaction.update(userDocRef, {
+        eliminationTokens: currentTokens + awarded,
+      });
+
+      return { success: true, tokensGranted: awarded };
+    });
+
+    return result;
+  } catch (err) {
+    console.error('Atomic challenge submission error:', err);
+    return {
+      success: false,
+      tokensGranted: 0,
+      error: err instanceof Error ? err.message : 'TRANSACTION_FAILED',
+    };
+  }
 }

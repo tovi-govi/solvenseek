@@ -54,3 +54,39 @@ export interface SeekerBroadcast {
   totalActiveSeekers: number;
   operator: string;
 }
+
+// ---------------------------------------------------------------------------
+// Hider Challenges (Competitive Shared Pool with First-Solve Lockout)
+// ---------------------------------------------------------------------------
+
+export type ChallengeCategory = 'CRYPTOGRAPHY' | 'NETWORK' | 'LOGIC' | 'LINUX' | 'OSINT' | 'CAMPUS';
+export type ChallengeDifficulty = 'EASY' | 'MEDIUM' | 'HARD';
+
+export interface ChallengeClaimant {
+  uid: string;
+  playerId: string;
+  username: string;
+}
+
+export interface Challenge {
+  id: string;
+  title: string;
+  description: string;
+  category: ChallengeCategory;
+  difficulty: ChallengeDifficulty;
+  points: number;
+  tokensAwarded: number;
+  answer?: string;
+  hints: string[];
+  isSolved: boolean;
+  solvedBy: ChallengeClaimant | null;
+  solvedAt: number | null;
+  order: number;
+}
+
+export interface ChallengeSolveResult {
+  success: boolean;
+  tokensGranted: number;
+  error?: string;
+  alreadySolvedBy?: string;
+}

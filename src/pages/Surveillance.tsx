@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { GameLayout } from '../components/layout/GameLayout';
 import { SurveillanceMap } from '../components/surveillance/SurveillanceMap';
@@ -12,9 +13,11 @@ import {
   Smartphone,
   QrCode,
   LogOut,
+  Terminal,
 } from 'lucide-react';
 
 export function Surveillance() {
+  const navigate = useNavigate();
   const { profile, logout } = useAuthStore();
   const { load, seekers } = useSurveillanceStore();
 
@@ -75,10 +78,29 @@ export function Surveillance() {
             </div>
           </div>
 
-          <span className="hidden md:inline-block text-[10px] px-2 py-0.5 rounded bg-cyber-success/15 border border-cyber-success/40 text-cyber-success font-bold">
+          <span className="hidden xl:inline-block text-[10px] px-2 py-0.5 rounded bg-cyber-success/15 border border-cyber-success/40 text-cyber-success font-bold">
             GRID ACTIVE
           </span>
         </div>
+
+        {/* Center: Navigation Switcher between Radar and Challenges */}
+        <nav className="flex items-center gap-1 bg-black/60 p-1 rounded border border-white/10 text-xs">
+          <button
+            onClick={() => navigate('/surveillance')}
+            className="flex items-center gap-1.5 px-3 py-1 rounded bg-cyber-accent/20 border border-cyber-accent/40 text-cyber-accent font-bold"
+          >
+            <Map className="w-3.5 h-3.5 text-cyber-accent" />
+            <span className="hidden sm:inline">SURVEILLANCE RADAR</span>
+          </button>
+
+          <button
+            onClick={() => navigate('/hider')}
+            className="flex items-center gap-1.5 px-3 py-1 rounded text-white/60 hover:text-white transition-colors"
+          >
+            <Terminal className="w-3.5 h-3.5 text-cyber-accent" />
+            <span className="hidden sm:inline">HIDER CHALLENGES</span>
+          </button>
+        </nav>
 
         {/* Center: Live Stats Quick Ticker */}
         <div className="hidden lg:flex items-center gap-5 text-xs text-cyber-muted">

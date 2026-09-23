@@ -82,3 +82,13 @@ export function subscribeToSeekerBroadcasts(
     if (latest) onBroadcast(latest);
   });
 }
+
+// ---------------------------------------------------------------------------
+// HIDER CHALLENGES (Competitive Pool with First-Solve Lockout)
+// ---------------------------------------------------------------------------
+
+export {
+  seedDefaultChallengesIfEmpty,
+  subscribeToRealChallenges,
+  submitChallengeAnswerAtomic,
+} from './firebase';
