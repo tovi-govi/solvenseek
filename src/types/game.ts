@@ -2,8 +2,17 @@
 // Core enums / unions
 // ---------------------------------------------------------------------------
 
-export type UserRole = 'HIDER' | 'SEEKER' | 'SURVEILLANCE';
+export type UserRole = 'HIDER' | 'SEEKER' | 'SURVEILLANCE' | 'hider' | 'seeker' | 'surveillance';
 export type UserStatus = 'ACTIVE' | 'ELIMINATED';
+
+/**
+ * Validates whether an operative has the required hider role.
+ * Role check is case-insensitive ('hider' or 'HIDER').
+ */
+export function isHiderRole(role?: string | null): boolean {
+  if (!role) return false;
+  return role.trim().toLowerCase() === 'hider';
+}
 
 // ---------------------------------------------------------------------------
 // Profile — Authoritative operator user record from Firebase
@@ -12,7 +21,7 @@ export type UserStatus = 'ACTIVE' | 'ELIMINATED';
 export interface Profile {
   id: string;
   username: string;
-  playerId: string; // display code e.g. SURV-E12F
+  playerId: string; // display code e.g. HDR-E12F
   role: UserRole;
   status: UserStatus;
   eliminationTokens: number;

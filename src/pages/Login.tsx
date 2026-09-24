@@ -14,16 +14,19 @@ import FaultyTerminal from '../components/ui/FaultyTerminal';
 
 export function Login() {
   const navigate = useNavigate();
-  const { signInWithEmail, signInWithGoogle, isLoading } = useAuthStore();
+  const { signInWithEmail, signInWithGoogle, isLoading, authError, clearAuthError } = useAuthStore();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [authInProgress, setAuthInProgress] = useState(false);
 
+  const activeError = errorMessage || authError;
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
+    clearAuthError();
 
     if (!email || !password) {
       setErrorMessage('Please fill in all required credentials.');
@@ -46,6 +49,7 @@ export function Login() {
 
   const handleGoogleSignIn = async () => {
     setErrorMessage(null);
+    clearAuthError();
     setAuthInProgress(true);
     try {
       const result = await signInWithGoogle();
@@ -99,7 +103,7 @@ export function Login() {
           <div className="flex items-center gap-2">
             <Radio className="w-4 h-4 text-cyber-accent animate-pulse" />
             <span className="text-[11px] font-bold tracking-widest text-cyber-accent uppercase">
-              SECURITY ACCESS NODE // PORT 443
+              HIDER ACCESS NODE // PORT 443
             </span>
           </div>
 
@@ -113,20 +117,20 @@ export function Login() {
         <div className="mb-6">
           <div className="text-xl font-black tracking-wider text-white flex items-center gap-2 font-display">
             <span>OPENVERSE</span>
-            <span className="text-cyber-accent">// SURVEILLANCE</span>
+            <span className="text-cyber-accent">// HIDER PORTAL</span>
           </div>
           <p className="text-xs text-cyber-muted mt-1">
-            Team Command Center Authorization Portal
+            Operative Authorization Terminal (Role: Hider Only)
           </p>
           <div className="mt-2 text-[10px] text-[#ffd700] bg-[#ffd700]/10 border border-[#ffd700]/25 px-2 py-1 rounded flex items-center justify-between">
             <span>FIREBASE PROJECT: <b>cmiyc-d170c</b></span>
-            <span className="text-white/60">AUTH & DB</span>
+            <span className="text-white/60">SCHEMA: role = hider</span>
           </div>
         </div>
 
         {/* Error Alert Banner */}
         <AnimatePresence>
-          {errorMessage && (
+          {activeError && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
@@ -135,7 +139,7 @@ export function Login() {
             >
               <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
               <div className="flex-1 leading-tight">
-                <span className="font-bold">AUTH ERROR:</span> {errorMessage}
+                <span className="font-bold">SECURITY ALERT:</span> {activeError}
               </div>
             </motion.div>
           )}
@@ -145,7 +149,7 @@ export function Login() {
         <form onSubmit={handleSubmit} className="space-y-3.5">
           <div>
             <label className="block text-[10px] text-cyber-muted uppercase tracking-wider mb-1">
-              SURVEILLANCE EMAIL
+              HIDER EMAIL
             </label>
             <div className="relative">
               <Mail className="absolute left-3 top-2.5 w-4 h-4 text-cyber-accent/60" />
@@ -234,7 +238,7 @@ export function Login() {
 
       {/* Footer Info */}
       <div className="relative z-10 mt-6 text-center text-[10px] text-cyber-muted space-y-1">
-        <p>OPENVERSE SURVEILLANCE SUITE // FIREBASE BACKEND INTEGRATED</p>
+        <p>OPENVERSE HIDER PORTAL // FIREBASE BACKEND INTEGRATED</p>
         <div className="flex items-center justify-center gap-3 text-cyber-accent/70">
           <span className="flex items-center gap-1">
             <span>Project: cmiyc-d170c</span>

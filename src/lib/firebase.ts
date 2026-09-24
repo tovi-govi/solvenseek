@@ -19,15 +19,15 @@ import { getAnalytics, isSupported } from 'firebase/analytics';
 import type { Profile, SeekerTelemetry, SeekerBroadcast, Challenge, ChallengeSolveResult } from '../types/game';
 import { getServerNow } from './serverTime';
 
-// Firebase configuration provided by user
+// Firebase configuration with environment variable support & fallback
 const firebaseConfig = {
-  apiKey: "AIzaSyBP2_ouW2tlw-JD2lU4xXFwmrf_Lm_s2fY",
-  authDomain: "cmiyc-d170c.firebaseapp.com",
-  projectId: "cmiyc-d170c",
-  storageBucket: "cmiyc-d170c.firebasestorage.app",
-  messagingSenderId: "762238097989",
-  appId: "1:762238097989:web:56a7dad85d439ad4f5e12c",
-  measurementId: "G-0FW1KQN31J"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyBP2_ouW2tlw-JD2lU4xXFwmrf_Lm_s2fY",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "cmiyc-d170c.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "cmiyc-d170c",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "cmiyc-d170c.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "762238097989",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:762238097989:web:56a7dad85d439ad4f5e12c",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-0FW1KQN31J"
 };
 
 // Initialize Firebase safely (prevent double initialization in HMR)
@@ -48,7 +48,8 @@ if (typeof window !== 'undefined') {
 }
 
 /**
- * Fetch or create an operator profile in Cloud Firestore ('users' collection)
+ * Fetch or create a user profile in Cloud Firestore ('users' collection).
+ * In the database schema, users are assigned role = 'hider'.
  */
 export async function getOrCreateUserProfile(
   uid: string,
@@ -61,22 +62,33 @@ export async function getOrCreateUserProfile(
     const snap = await getDoc(userRef);
     if (snap.exists()) {
       const data = snap.data();
+      const existingRole = data.role;
+      const role = (existingRole ?? 'hider') as Profile['role'];
+
+      // If document in schema was missing role, populate role = 'hider'
+      if (!existingRole) {
+        await setDoc(userRef, { role: 'hider' }, { merge: true }).catch((e) => {
+          console.warn('Could not persist default hider role to Firestore:', e);
+        });
+      }
+
       return {
         id: uid,
-        playerId: data.playerId ?? `SURV-${uid.slice(0, 4).toUpperCase()}`,
-        username: data.username ?? displayName ?? email?.split('@')[0] ?? 'OPERATOR',
-        role: 'SURVEILLANCE',
-        status: 'ACTIVE',
-        eliminationTokens: 0,
+        playerId: data.playerId ?? `HDR-${uid.slice(0, 4).toUpperCase()}`,
+        username: data.username ?? displayName ?? email?.split('@')[0] ?? 'HIDER',
+        role: role,
+        status: data.status ?? 'ACTIVE',
+        eliminationTokens: Number(data.eliminationTokens ?? 0),
         createdAt: data.createdAt ?? new Date().toISOString(),
       };
     }
 
+    // New operative document in database schema: assigned role = 'hider'
     const newProfile: Profile = {
       id: uid,
-      playerId: `SURV-${uid.slice(0, 4).toUpperCase()}`,
-      username: displayName ?? email?.split('@')[0] ?? 'OPERATOR',
-      role: 'SURVEILLANCE',
+      playerId: `HDR-${uid.slice(0, 4).toUpperCase()}`,
+      username: displayName ?? email?.split('@')[0] ?? 'HIDER',
+      role: 'hider',
       status: 'ACTIVE',
       eliminationTokens: 0,
       createdAt: new Date().toISOString(),
@@ -92,9 +104,9 @@ export async function getOrCreateUserProfile(
     console.warn('Firestore user profile fetch/create fallback:', err);
     return {
       id: uid,
-      playerId: `SURV-${uid.slice(0, 4).toUpperCase()}`,
-      username: displayName ?? email?.split('@')[0] ?? 'OPERATOR',
-      role: 'SURVEILLANCE',
+      playerId: `HDR-${uid.slice(0, 4).toUpperCase()}`,
+      username: displayName ?? email?.split('@')[0] ?? 'HIDER',
+      role: 'hider',
       status: 'ACTIVE',
       eliminationTokens: 0,
       createdAt: new Date().toISOString(),

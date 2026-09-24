@@ -1,0 +1,49 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // 1. User Profiles
+    // Authenticated users can read operative profiles; users can create/update their own profile
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isOwner(userId);
+      allow delete: if false;
+    }
+
+    // 2. Hider Challenges Pool
+    // Read: Any authenticated operative
+    // Update: Allowed for answer submission / claiming an unsolved challenge
+    // Create: Allowed during auto-seeding if collection is empty
+    match /challenges/{challengeId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    // 3. Seeker Telemetry (Real-time tracking)
+    match /seekers/{seekerId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // 4. Tactical Broadcasts (10-minute position sharing)
+    match /broadcasts/{broadcastId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+    }
+
+    // 5. System State (Cooldown timers)
+    match /system/{docId} {
+      allow read, write: if isAuthenticated();
+    }
+  }
+}

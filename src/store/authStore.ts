@@ -9,13 +9,14 @@ import {
   type User,
 } from 'firebase/auth';
 import { auth, getOrCreateUserProfile } from '../lib/firebase';
-import type { Profile } from '../types/game';
+import { type Profile, isHiderRole } from '../types/game';
 
 interface AuthStore {
   profile: Profile | null;
   firebaseUser: User | null;
   isLoading: boolean;
   isInitialized: boolean;
+  authError: string | null;
 
   initialize: () => void;
   signInWithEmail: (email: string, password: string) => Promise<{ error?: string }>;
@@ -25,6 +26,7 @@ interface AuthStore {
   setProfile: (p: Profile | null) => void;
   updateTokens: (tokens: number) => void;
   updateStatus: (status: Profile['status']) => void;
+  clearAuthError: () => void;
 }
 
 function parseFirebaseError(err: unknown): string {
@@ -34,12 +36,12 @@ function parseFirebaseError(err: unknown): string {
       case 'auth/invalid-email':
         return 'Invalid email address format.';
       case 'auth/user-not-found':
-        return 'No surveillance account found with this email.';
+        return 'No hider account found with this email.';
       case 'auth/wrong-password':
       case 'auth/invalid-credential':
         return 'Invalid email or password.';
       case 'auth/email-already-in-use':
-        return 'An operator account already exists with this email address.';
+        return 'An account already exists with this email address.';
       case 'auth/weak-password':
         return 'Password is too weak. Must be at least 6 characters.';
       case 'auth/popup-closed-by-user':
@@ -60,7 +62,13 @@ const CACHE_PROFILE_KEY = 'cmiyc_cached_profile';
 function getCachedProfile(): Profile | null {
   try {
     const raw = localStorage.getItem(CACHE_PROFILE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    const profile = JSON.parse(raw) as Profile;
+    if (!isHiderRole(profile.role)) {
+      localStorage.removeItem(CACHE_PROFILE_KEY);
+      return null;
+    }
+    return profile;
   } catch {
     return null;
   }
@@ -97,19 +105,36 @@ export const useAuthStore = create<AuthStore>((set, get) => {
       if (user) {
         try {
           const profile = await getOrCreateUserProfile(user.uid, user.email, user.displayName);
+
+          // Enforce role = 'hider' in schema
+          if (!isHiderRole(profile.role)) {
+            console.warn(`Access denied for ${user.uid}: role "${profile.role}" is not authorized. Hider role required.`);
+            await signOut(auth);
+            setCachedProfile(null);
+            set({
+              firebaseUser: null,
+              profile: null,
+              authError: `ACCESS DENIED: Role "${profile.role}" is not authorized. Only operatives with role = "hider" can access this app.`,
+              isLoading: false,
+              isInitialized: true,
+            });
+            return;
+          }
+
           setCachedProfile(profile);
           set({
             firebaseUser: user,
             profile,
+            authError: null,
             isLoading: false,
             isInitialized: true,
           });
         } catch {
           const fallbackProfile: Profile = {
             id: user.uid,
-            playerId: `SURV-${user.uid.slice(0, 4).toUpperCase()}`,
-            username: user.displayName ?? user.email?.split('@')[0] ?? 'OPERATOR',
-            role: 'SURVEILLANCE',
+            playerId: `HDR-${user.uid.slice(0, 4).toUpperCase()}`,
+            username: user.displayName ?? user.email?.split('@')[0] ?? 'HIDER',
+            role: 'hider',
             status: 'ACTIVE',
             eliminationTokens: 0,
             createdAt: new Date().toISOString(),
@@ -118,6 +143,7 @@ export const useAuthStore = create<AuthStore>((set, get) => {
           set({
             firebaseUser: user,
             profile: fallbackProfile,
+            authError: null,
             isLoading: false,
             isInitialized: true,
           });
@@ -144,19 +170,29 @@ export const useAuthStore = create<AuthStore>((set, get) => {
     firebaseUser: null,
     isLoading: !initialCached,
     isInitialized: false,
+    authError: null,
 
     initialize: () => {
       attachListener();
     },
 
     signInWithEmail: async (email, password) => {
-      set({ isLoading: true });
+      set({ isLoading: true, authError: null });
       try {
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
         const profile = await getOrCreateUserProfile(user.uid, user.email, user.displayName);
+
+        if (!isHiderRole(profile.role)) {
+          await signOut(auth);
+          setCachedProfile(null);
+          const errorMsg = `ACCESS DENIED: Role "${profile.role}" is not authorized. Only operatives with role = "hider" can access this app.`;
+          set({ firebaseUser: null, profile: null, authError: errorMsg, isLoading: false, isInitialized: true });
+          return { error: errorMsg };
+        }
+
         setCachedProfile(profile);
-        set({ firebaseUser: user, profile, isLoading: false, isInitialized: true });
+        set({ firebaseUser: user, profile, authError: null, isLoading: false, isInitialized: true });
         return {};
       } catch (err) {
         set({ isLoading: false });
@@ -165,13 +201,22 @@ export const useAuthStore = create<AuthStore>((set, get) => {
     },
 
     signUpWithEmail: async (email, password, callsign) => {
-      set({ isLoading: true });
+      set({ isLoading: true, authError: null });
       try {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
         const profile = await getOrCreateUserProfile(user.uid, user.email, callsign || user.displayName);
+
+        if (!isHiderRole(profile.role)) {
+          await signOut(auth);
+          setCachedProfile(null);
+          const errorMsg = `ACCESS DENIED: Role "${profile.role}" is not authorized. Only operatives with role = "hider" can access this app.`;
+          set({ firebaseUser: null, profile: null, authError: errorMsg, isLoading: false, isInitialized: true });
+          return { error: errorMsg };
+        }
+
         setCachedProfile(profile);
-        set({ firebaseUser: user, profile, isLoading: false, isInitialized: true });
+        set({ firebaseUser: user, profile, authError: null, isLoading: false, isInitialized: true });
         return {};
       } catch (err) {
         set({ isLoading: false });
@@ -180,15 +225,24 @@ export const useAuthStore = create<AuthStore>((set, get) => {
     },
 
     signInWithGoogle: async () => {
-      set({ isLoading: true });
+      set({ isLoading: true, authError: null });
       try {
         const provider = new GoogleAuthProvider();
         provider.setCustomParameters({ prompt: 'select_account' });
         const result = await signInWithPopup(auth, provider);
         const user = result.user;
         const profile = await getOrCreateUserProfile(user.uid, user.email, user.displayName);
+
+        if (!isHiderRole(profile.role)) {
+          await signOut(auth);
+          setCachedProfile(null);
+          const errorMsg = `ACCESS DENIED: Role "${profile.role}" is not authorized. Only operatives with role = "hider" can access this app.`;
+          set({ firebaseUser: null, profile: null, authError: errorMsg, isLoading: false, isInitialized: true });
+          return { error: errorMsg };
+        }
+
         setCachedProfile(profile);
-        set({ firebaseUser: user, profile, isLoading: false, isInitialized: true });
+        set({ firebaseUser: user, profile, authError: null, isLoading: false, isInitialized: true });
         return {};
       } catch (err) {
         set({ isLoading: false });
@@ -203,7 +257,7 @@ export const useAuthStore = create<AuthStore>((set, get) => {
         console.warn('Sign out error:', err);
       }
       setCachedProfile(null);
-      set({ profile: null, firebaseUser: null, isLoading: false, isInitialized: true });
+      set({ profile: null, firebaseUser: null, authError: null, isLoading: false, isInitialized: true });
     },
 
     setProfile: (profile) => {
@@ -216,5 +270,7 @@ export const useAuthStore = create<AuthStore>((set, get) => {
 
     updateStatus: (status) =>
       set((state) => (state.profile ? { profile: { ...state.profile, status } } : {})),
+
+    clearAuthError: () => set({ authError: null }),
   };
 });
