@@ -4,9 +4,7 @@ import { useSurveillanceStore } from '../../store/surveillanceStore';
 import type { SeekerTelemetry } from '../../types/game';
 import {
   Smartphone,
-  Battery,
   Wifi,
-  Navigation,
   QrCode,
   MapPin,
   X,
@@ -249,28 +247,10 @@ export function SeekerTelemetryDrawer({ onClose }: SeekerTelemetryDrawerProps) {
           <div className="grid grid-cols-2 gap-2 text-[11px]">
             <div className="bg-white/5 p-2 rounded border border-white/5">
               <div className="text-cyber-muted text-[10px] flex items-center gap-1">
-                <Battery className="w-3 h-3 text-cyber-accent" /> BATTERY
-              </div>
-              <div className="text-white font-bold text-sm mt-0.5">
-                {selectedSeeker.battery}%
-              </div>
-            </div>
-
-            <div className="bg-white/5 p-2 rounded border border-white/5">
-              <div className="text-cyber-muted text-[10px] flex items-center gap-1">
                 <Wifi className="w-3 h-3 text-cyber-accent" /> SIGNAL
               </div>
               <div className="text-white font-bold text-sm mt-0.5">
                 {selectedSeeker.signal}
-              </div>
-            </div>
-
-            <div className="bg-white/5 p-2 rounded border border-white/5">
-              <div className="text-cyber-muted text-[10px] flex items-center gap-1">
-                <Navigation className="w-3 h-3 text-cyber-accent" /> SPEED
-              </div>
-              <div className="text-white font-bold text-sm mt-0.5">
-                {selectedSeeker.speedKmh ?? 0} km/h
               </div>
             </div>
 
