@@ -115,69 +115,94 @@ export async function getOrCreateUserProfile(
 }
 
 /**
- * Real-time listener for real seekers in Cloud Firestore ('seekers' collection)
+ * Real-time listener for seekers collection in Cloud Firestore ('seekers' collection)
+ * Listens to active seekers and maps fields matching the mobile app schema.
  */
-export function subscribeToRealSeekers(onUpdate: (seekers: SeekerTelemetry[]) => void): () => void {
+export function subscribeToSeekers(onUpdate: (seekers: SeekerTelemetry[]) => void): () => void {
   try {
-    const seekersCol = collection(db, 'seekers');
-    const unsub = onSnapshot(
-      seekersCol,
+    const seekersRef = collection(db, 'seekers');
+
+    return onSnapshot(
+      seekersRef,
       (snapshot) => {
-        const seekers: SeekerTelemetry[] = snapshot.docs.map((docSnap) => {
-          const d = docSnap.data();
+        const list = snapshot.docs.map((docSnap) => {
+          const data = docSnap.data();
           return {
             id: docSnap.id,
-            playerId: d.playerId ?? `S-${docSnap.id.slice(0, 3).toUpperCase()}`,
-            name: d.name ?? 'Seeker Node',
-            zoneId: d.zoneId ?? 'new-west',
-            zoneName: d.zoneName ?? 'New Building (West)',
-            x: Number(d.x ?? 250),
-            y: Number(d.y ?? 250),
-            battery: Number(d.battery ?? 100),
-            signal: d.signal ?? 'STRONG',
-            status: d.status ?? 'ACTIVE',
-            speedKmh: Number(d.speedKmh ?? 0),
-            qrScannedCount: Number(d.qrScannedCount ?? 0),
-            lastPing: d.lastPing ?? Date.now(),
-          };
+            uid: data.uid || docSnap.id,
+            playerId: data.playerId || `p_${docSnap.id.slice(0, 6)}`,
+            name: data.name || 'Seeker',
+            teamId: data.teamId || 'alpha',
+            active: Boolean(data.active),
+            status: data.status || 'ACTIVE',
+            lat: typeof data.lat === 'number' ? data.lat : undefined,
+            lon: typeof data.lon === 'number' ? data.lon : undefined,
+            x: Number(data.x ?? 500),
+            y: Number(data.y ?? 375),
+            zoneId: data.zoneId || 'unknown',
+            zoneName: data.zoneName || 'In Transit',
+            battery: Number(data.battery ?? 100),
+            signal: data.signal ?? 'STRONG',
+            speedKmh: Number(data.speedKmh ?? 0),
+            headingDeg: data.headingDeg ?? null,
+            accuracyM: data.accuracyM != null ? Number(data.accuracyM) : undefined,
+            qrScannedCount: Number(data.qrScannedCount ?? 0),
+            lastPing: typeof data.lastPing === 'number' ? data.lastPing : Date.now(),
+          } as SeekerTelemetry;
         });
-        onUpdate(seekers);
+
+        // Client-side sort by lastPing descending (avoids composite index overrides)
+        list.sort((a, b) => (b.lastPing || 0) - (a.lastPing || 0));
+
+        onUpdate(list);
       },
       (error) => {
-        console.warn('Real Firestore seekers subscription error:', error);
+        console.error('Seeker telemetry subscription error:', error);
       }
     );
-    return unsub;
   } catch (err) {
-    console.warn('Could not subscribe to seekers collection:', err);
+    console.error('Could not subscribe to seekers collection:', err);
     return () => {};
   }
 }
+
+export const subscribeToRealSeekers = subscribeToSeekers;
 
 /**
  * Fetch all real seekers once from Cloud Firestore
  */
 export async function fetchRealSeekers(): Promise<SeekerTelemetry[]> {
   try {
-    const snap = await getDocs(collection(db, 'seekers'));
-    return snap.docs.map((docSnap) => {
-      const d = docSnap.data();
+    const seekersRef = collection(db, 'seekers');
+    const snap = await getDocs(seekersRef);
+    const list = snap.docs.map((docSnap) => {
+      const data = docSnap.data();
       return {
         id: docSnap.id,
-        playerId: d.playerId ?? `S-${docSnap.id.slice(0, 3).toUpperCase()}`,
-        name: d.name ?? 'Seeker Node',
-        zoneId: d.zoneId ?? 'new-west',
-        zoneName: d.zoneName ?? 'New Building (West)',
-        x: Number(d.x ?? 250),
-        y: Number(d.y ?? 250),
-        battery: Number(d.battery ?? 100),
-        signal: d.signal ?? 'STRONG',
-        status: d.status ?? 'ACTIVE',
-        speedKmh: Number(d.speedKmh ?? 0),
-        qrScannedCount: Number(d.qrScannedCount ?? 0),
-        lastPing: d.lastPing ?? Date.now(),
-      };
+        uid: data.uid || docSnap.id,
+        playerId: data.playerId || `p_${docSnap.id.slice(0, 6)}`,
+        name: data.name || 'Seeker',
+        teamId: data.teamId || 'alpha',
+        active: Boolean(data.active),
+        status: data.status || 'ACTIVE',
+        lat: typeof data.lat === 'number' ? data.lat : undefined,
+        lon: typeof data.lon === 'number' ? data.lon : undefined,
+        x: Number(data.x ?? 500),
+        y: Number(data.y ?? 375),
+        zoneId: data.zoneId || 'unknown',
+        zoneName: data.zoneName || 'In Transit',
+        battery: Number(data.battery ?? 100),
+        signal: data.signal ?? 'STRONG',
+        speedKmh: Number(data.speedKmh ?? 0),
+        headingDeg: data.headingDeg ?? null,
+        accuracyM: data.accuracyM != null ? Number(data.accuracyM) : undefined,
+        qrScannedCount: Number(data.qrScannedCount ?? 0),
+        lastPing: typeof data.lastPing === 'number' ? data.lastPing : Date.now(),
+      } as SeekerTelemetry;
     });
+
+    list.sort((a, b) => (b.lastPing || 0) - (a.lastPing || 0));
+    return list;
   } catch (err) {
     console.warn('Error fetching real seekers from Firestore:', err);
     return [];

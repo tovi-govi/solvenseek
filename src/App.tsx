@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/authStore';
 import { isHiderRole } from './types/game';
 import { Surveillance } from './pages/Surveillance';
-import { Hider } from './pages/Hider';
 import { Login } from './pages/Login';
 import { ShieldAlert, LogOut } from 'lucide-react';
 
@@ -105,25 +104,15 @@ function AppRoutes() {
         }
       />
 
-      {/* Protected Hider Matrix Dashboard (Primary) */}
+      {/* Surveillance Radar (Primary View) */}
       <Route
         path="/"
         element={
           <RequireAuth>
-            <Hider />
+            <Surveillance />
           </RequireAuth>
         }
       />
-      <Route
-        path="/hider"
-        element={
-          <RequireAuth>
-            <Hider />
-          </RequireAuth>
-        }
-      />
-
-      {/* Surveillance Radar (Accessible to authorized Hiders) */}
       <Route
         path="/surveillance"
         element={
@@ -140,8 +129,14 @@ function AppRoutes() {
           </RequireAuth>
         }
       />
+      <Route
+        path="/hider"
+        element={
+          <Navigate to="/" replace />
+        }
+      />
 
-      {/* Catch-all: redirect to hider dashboard */}
+      {/* Catch-all: redirect to primary dashboard */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

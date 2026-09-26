@@ -33,21 +33,26 @@ export interface Profile {
 // ---------------------------------------------------------------------------
 
 export interface SeekerTelemetry {
-  id: string;
-  playerId: string; // e.g. S-001
-  name: string; // e.g. "Echo Agent"
-  zoneId: string; // e.g. 'academic_1' | 'admin' | 'sports_ground'
-  zoneName: string; // e.g. "Academic Block 1", "Main Sports Ground"
-  x: number; // Normalized map coordinate (0-1000)
-  y: number; // Normalized map coordinate (0-800)
-  lat?: number; // Real-world GPS Latitude (e.g. 9.754904)
-  lon?: number; // Real-world GPS Longitude (e.g. 76.649988)
-  battery: number; // Battery % (e.g. 84)
+  id: string;               // Document ID (seeker UID)
+  uid: string;
+  playerId: string;         // e.g. "p_abc123"
+  name: string;             // Seeker callsign
+  teamId: string;           // "alpha" | "bravo"
+  active: boolean;          // true when tracking is active
+  status: 'ACTIVE' | 'IN_TRANSIT' | 'offline';
+  lat?: number;             // Real-world GPS Latitude
+  lon?: number;             // Real-world GPS Longitude
+  x: number;                // Normalized campus X (0 - 1000)
+  y: number;                // Normalized campus Y (0 - 750)
+  zoneId: string;           // e.g. "academic_1", "dining", "oat"
+  zoneName: string;         // e.g. "Academic Block 1"
+  battery: number;          // 0 - 100
   signal: 'STRONG' | 'GOOD' | 'WEAK';
-  status: 'ACTIVE' | 'CLAIMING_ARTIFACT' | 'IN_TRANSIT';
-  speedKmh?: number;
-  qrScannedCount?: number; // Valid artifacts scanned
-  lastPing: number; // timestamp ms
+  speedKmh: number;         // Travel speed
+  headingDeg?: number | null;
+  accuracyM?: number;
+  qrScannedCount: number;   // Number of artifacts scanned (0 - 15)
+  lastPing: number;         // Epoch timestamp in milliseconds (Date.now())
 }
 
 export interface SeekerBroadcast {

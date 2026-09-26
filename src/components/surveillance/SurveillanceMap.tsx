@@ -218,6 +218,16 @@ export function SurveillanceMap({ onSelectSeeker }: SurveillanceMapProps) {
         map.setView(pos, Math.max(map.getZoom(), 18), { animate: true });
       });
 
+      // Interactive Popup on Click
+      marker.bindPopup(
+        `<div style="font-family: monospace; font-size: 11px; background: rgba(3,7,18,0.95); border: 1px solid #ffd700; padding: 6px 10px; border-radius: 3px; color: #fff;">
+          <p style="font-weight: bold; margin: 0 0 4px 0; color: #ffd700;">${seeker.name} (${seeker.playerId})</p>
+          <p style="margin: 2px 0;">Zone: ${seeker.zoneName}</p>
+          <p style="margin: 2px 0;">Battery: ${seeker.battery}%</p>
+          <p style="margin: 2px 0;">Artifacts: ${seeker.qrScannedCount ?? 0}</p>
+        </div>`
+      );
+
       // Tooltip on Hover
       marker.bindTooltip(
         `<div style="font-family: monospace; font-size: 11px; background: rgba(3,7,18,0.95); border: 1px solid #ffd700; padding: 6px 10px; border-radius: 3px; color: #fff; min-width: 160px; box-shadow: 0 0 15px rgba(255,215,0,0.25);">

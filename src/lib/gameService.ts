@@ -88,6 +88,7 @@ export function subscribeToSeekerBroadcasts(
 // ---------------------------------------------------------------------------
 
 export {
+  subscribeToSeekers,
   seedDefaultChallengesIfEmpty,
   subscribeToRealChallenges,
   submitChallengeAnswerAtomic,

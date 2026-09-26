@@ -43,6 +43,10 @@ export function SeekerTelemetryDrawer({ onClose }: SeekerTelemetryDrawerProps) {
   const selectedSeeker = seekers.find((s) => s.id === selectedSeekerId) ?? seekers[0];
   const totalTeamArtifacts = seekers.reduce((sum, s) => sum + (s.qrScannedCount ?? 0), 0);
   const remainingArtifacts = Math.max(0, 15 - totalTeamArtifacts);
+  const isOnline = (seeker: SeekerTelemetry) => {
+    const fiveMinutesMs = 5 * 60 * 1000;
+    return seeker.active && (Date.now() - seeker.lastPing < fiveMinutesMs);
+  };
 
   const handleAddSeeker = async (e: FormEvent) => {
     e.preventDefault();
@@ -56,8 +60,12 @@ export function SeekerTelemetryDrawer({ onClose }: SeekerTelemetryDrawerProps) {
 
     const newSeeker: SeekerTelemetry = {
       id: `seeker-${Date.now()}`,
+      uid: `u_${Date.now()}`,
       playerId: newNodeId.trim().toUpperCase(),
       name: newNodeName.trim(),
+      teamId: 'alpha',
+      active: true,
+      status: 'ACTIVE',
       zoneId: facility.key,
       zoneName: facility.name,
       x,
@@ -66,7 +74,6 @@ export function SeekerTelemetryDrawer({ onClose }: SeekerTelemetryDrawerProps) {
       lon,
       battery: 100,
       signal: 'STRONG',
-      status: 'ACTIVE',
       speedKmh: 0,
       qrScannedCount: 0,
       lastPing: Date.now(),
@@ -148,22 +155,26 @@ export function SeekerTelemetryDrawer({ onClose }: SeekerTelemetryDrawerProps) {
 
       {/* Seeker Selector Pills & Add Button */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none mb-3">
-        {seekers.map((s) => (
-          <button
-            key={s.id}
-            onClick={() => setSelectedSeeker(s.id)}
-            className={`px-2 py-1 rounded text-[10px] whitespace-nowrap transition-colors flex items-center gap-1.5 ${
-              selectedSeeker && s.id === selectedSeeker.id
-                ? 'bg-[#ffd700] text-black font-bold shadow-[0_0_8px_rgba(255,215,0,0.3)]'
-                : 'bg-white/5 text-cyber-muted hover:text-white border border-white/5'
-            }`}
-          >
-            <span>{s.playerId}</span>
-            <span className={`text-[9px] ${selectedSeeker && s.id === selectedSeeker.id ? 'text-black/80 font-bold' : 'text-[#ffd700]'}`}>
-              ({s.qrScannedCount ?? 0} found)
-            </span>
-          </button>
-        ))}
+        {seekers.map((s) => {
+          const online = isOnline(s);
+          return (
+            <button
+              key={s.id}
+              onClick={() => setSelectedSeeker(s.id)}
+              className={`px-2 py-1 rounded text-[10px] whitespace-nowrap transition-colors flex items-center gap-1.5 ${
+                selectedSeeker && s.id === selectedSeeker.id
+                  ? 'bg-[#ffd700] text-black font-bold shadow-[0_0_8px_rgba(255,215,0,0.3)]'
+                  : 'bg-white/5 text-cyber-muted hover:text-white border border-white/5'
+              }`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${online ? 'bg-cyber-success animate-pulse' : 'bg-white/30'}`} />
+              <span>{s.playerId}</span>
+              <span className={`text-[9px] ${selectedSeeker && s.id === selectedSeeker.id ? 'text-black/80 font-bold' : 'text-[#ffd700]'}`}>
+                ({s.qrScannedCount ?? 0} found)
+              </span>
+            </button>
+          );
+        })}
 
         <button
           onClick={() => setShowAddModal(true)}
@@ -214,12 +225,14 @@ export function SeekerTelemetryDrawer({ onClose }: SeekerTelemetryDrawerProps) {
             <div className="flex items-center gap-2">
               <span
                 className={`px-2 py-0.5 text-[10px] rounded uppercase font-bold border ${
-                  selectedSeeker.status === 'CLAIMING_ARTIFACT'
+                  !isOnline(selectedSeeker)
+                    ? 'bg-white/10 text-white/50 border-white/20'
+                    : selectedSeeker.status === 'IN_TRANSIT'
                     ? 'bg-cyber-accent/20 text-cyber-accent border-cyber-accent/40 animate-pulse'
                     : 'bg-cyber-success/20 text-cyber-success border-cyber-success/40'
                 }`}
               >
-                {selectedSeeker.status.replace('_', ' ')}
+                {!isOnline(selectedSeeker) ? 'OFFLINE / STALE' : selectedSeeker.status.replace('_', ' ')}
               </span>
 
               <button
